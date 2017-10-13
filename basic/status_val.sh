@@ -6,7 +6,7 @@
 echo $HOME
 # シェルを呼び出してからの秒数
 echo $SECONDS
-# 実行中のシェルのパス名
+# 実行中のシェルのパス名(ログインシェルとは限らない)
 echo $BASH
 # 実行中のシェルのバージョン番号
 echo $BASH_VERSION
@@ -32,7 +32,7 @@ echo $COLUMNS
 echo $EDITOR
 # ディスプレイの行数(shell上からは表示されない)
 echo $LINES
-# シェルのパス名
+# ログインシェルのパス名
 echo $SHELL
 # 使用している端末の種類
 echo $TERM
