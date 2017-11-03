@@ -39,3 +39,67 @@ typeコマンドを使えば、そのコマンドがエイリアスなのか組�
 $ type -a ll
 ll は `ls -l --color=auto' のエイリアスです
 
+・関数のローカル変数
+変数にlocalをつけて定義すると、関数内をスコープとするローカル変数を定義できる。
+関数内での$1、$2は関数へのパラメータを表すローカル変数となる。
+例：afunc.sh
+
+function afunc
+{
+	local var1
+	var1="in function"
+
+	echo "param: ${0} ${1} ${2}"
+	echo "var1: ${var1}"
+}
+
+var1="out function"
+echo "var1: ${var1}"
+afunc func_par1 func_par2
+echo "var1: ${var1}"
+# $0はグローバル変数
+echo "param: ${0} ${1} ${2}"
+
+結果：
+$ ./afunc.sh scr1 scr1
+var1: out function
+param: ./afunc.sh func_par1 func_par2
+var1: in function
+var1: out function
+param: ./afunc.sh scr1 scr1
+
+・全パラメータを表す「$@」「$*」
+$*	要素がスペースではなく、IFS環境変数の最初の１文字で区切られる。
+$@  各要素がダブルコード括りで格納されている
+
+例：param_all.sh
+function countargs
+{
+	echo "$# args."
+}
+
+countargs "$@"
+# 一つの引数として認識されてしましう
+countargs "$*"
+
+# このシェルだけIFS環境変数を変更（呼び出し元シェルには影響ない）
+IFS=,
+# 区切り文字が変換されて出力される
+echo "$*"
+echo "$@"
+
+結果：
+$ ./param_all.sh aaa bbb cc
+3 args.
+1 args.
+aaa,bbb,cc
+aaa bbb cc
+
+・変数の記述と区切り
+変数$abcは${abc}の省略形である。
+変数$abcにアンダースコアをつけたい場合、省略形の形では実現できない。
+$abc_	変数$abc_と判断される
+${abc}_	変数$abcに_がつく。
+
+変数名の後に英数字とアンダースコア以外の文字がきた場合は省略形でもOK
+/$abc/$def/$hig		各変数を/で連結したものを表示
