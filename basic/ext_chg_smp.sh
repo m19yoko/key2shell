@@ -17,4 +17,6 @@ echo "ドット以降は全て除いて表示 ${path%%.*}"
 echo "long => short ${path/long/short}"
 # 一部を置換して表示(ヒットした全て文字を置換) /home/cam/book/short.file.name
 echo "am => pm ${path//am/pm}"
+# 拡張子を表示 name
+echo "extension ${path##*.}"
 
