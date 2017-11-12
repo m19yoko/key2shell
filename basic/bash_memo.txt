@@ -249,6 +249,21 @@ for 変数 in リスト; do
 	何か処理
 done
 
+・for文の基本構文(その他)
+for (( 初期値 ; 終了条件 ; 更新処理 ))
+do
+	処理
+done
+例：
+for (( i=1; i<=3; i++ ))
+do
+	for (( j=1; j<=3; j++ ))
+	do
+		echo "iは$i、jは$j"
+	done
+done
+
+
 ・関数ではなく、コマンドを実行する
 commandコマンドを使えば、同名の関数があってもコマンドを実行する。
 例：ls関数が定義されている場合でもlsコマンドを実行する
@@ -329,4 +344,61 @@ C言語同様なもの
 ~ ビット単位の論理否定
 ^ ビット単位の排他的論理和
 ** べき乗
+
+・bashの算術計算(let)を使う
+例：
+# インクリメントが使える
+let a=1
+let a++
+echo $a #=> 2
+
+# 代入演算子が使える
+a=2
+let a*=3
+echo $a #=> 6
+
+# 三項演算子が使える
+let a=1
+let  a=(a ==2 ? 1 : 0)
+echo $a  #=> 0
+
+# 複数の式をまとめて記述できる
+a=10
+let a++ a++ a++
+echo $a #=> 13
+
+・bashのインクリメント「$(())を使う」
+cnt=1
+((cnt++))	# 代入しない場合は先頭に$をつけない
+echo $cnt # => 2
+cnt=$((cnt++))	
+echo $cnt # => 2 変わらない。インクリメントする前の値が代入される
+cnt=$((++cnt))	
+echo $cnt # => 3
+cnt=$((cnt += 1))	
+echo $cnt # => 4
+
+・配列の使用
+例：
+names[0]="ao"
+names[1]="aka"
+names[2]="midori"
+または
+names=([0]="ao" [1]="aka" [2]="midori")
+または
+names=("ao" "aka" "midori")
+# 要素ごと出力
+echo ${names[0]}  # $names[0]では正しい値が返らないことに注意
+echo ${names[1]}
+echo ${names[2]}
+# for文で出力
+for name in "${names[@]}"; do
+	echo $name
+done
+
+・配列のインデスク、サイズを返す
+例：
+names=([0]="ao" [1]="aka" [5]="midori")
+echo "${!names[@]}"  # => 0 1 5
+echo "${#names[@]}"  # => 3  配列サイズを返す
 
