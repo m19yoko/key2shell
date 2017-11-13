@@ -402,3 +402,36 @@ names=([0]="ao" [1]="aka" [5]="midori")
 echo "${!names[@]}"  # => 0 1 5
 echo "${#names[@]}"  # => 3  配列サイズを返す
 
+・ヒアドキュメント
+例：EOFまでの内容を"msgfile.txt"に出力
+    EOFとEOFの間の文字列がcatの標準入力となり、$msgfileへリダイレクトする。
+msgfile="msgfile.txt"
+cat >> $msgfile << EOF
+this is text of
+our message
+EOF
+
+例：<<のあとに「-」をつけると、行頭のタブを削除してリダイレクトする
+msgfile="msgfile.txt"
+cat >> $msgfile <<- EOF
+	this is text of
+	our message
+EOF
+
+・printf
+C言語にある、printfのような働きをするコマンド。echo文と違って自動的に改行されない。
+例：
+$ printf "%s %s \n" hello world
+hello world
+
+・空白埋めして文字を出力する
+例：左に空白埋めする
+$ printf "[%10s]\n" hello
+[     hello]
+例：右に空白埋めする
+$ printf "[%-10s]\n" hello
+[hello     ]
+
+・0埋めして数値を出力する
+$ printf "[%010d]\n" 100
+[0000000100]
