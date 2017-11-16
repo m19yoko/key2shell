@@ -435,3 +435,57 @@ $ printf "[%-10s]\n" hello
 ・0埋めして数値を出力する
 $ printf "[%010d]\n" 100
 [0000000100]
+
+・コマンドブロックでのリダイレクト
+例：ファイルから読み込んだ結果を表示
+$ cat def.txt	# ファイルの内容
+abc def
+hij lmn
+opq rstu
+vwzyz 123
+(シェルの内容) # abc.sh
+msgfile="def.txt"
+{
+	while read var1 var2; do	# 標準入力より読み込み、変数に格納。
+		echo "var1 $var1"
+		echo "var2 $var2"
+	done 
+} < $msgfilea;	# ブロックへの標準入力をファイルにする
+
+(実行結果)
+$ ./abc.sh
+var1 abc
+var2 def
+var1 hij
+var2 lmn
+var1 opq
+var2 rstu
+var1 vwzyz
+var2 123
+
+・bashでのログの出力方法
+リダイレクトは関数でも可能である。
+それを応用したログの出力方法を考えてみた。
+(msgoutput.sh)
+msgoutput() {
+	echo "$(date) $1"
+} >> output.log
+
+(abc.sh)
+source msgoutput.sh
+msgoutput "あいう"
+msgoutput "かきく"
+msgoutput "けこ"
+
+(実行結果)
+$ ./abc.sh
+$	# 標準出力には何も出でこない
+$   # 代わりにログに出力されている
+$ cat output.log
+2017年 11月 16日 木曜日 23:45:15 JST あいう
+2017年 11月 16日 木曜日 23:45:15 JST かきく
+2017年 11月 16日 木曜日 23:45:15 JST けこ
+
+・コマンドライン展開の仕組み
+入門bash P190からをみよ。
+
