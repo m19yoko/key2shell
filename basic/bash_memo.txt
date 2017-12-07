@@ -587,3 +587,16 @@ $ ./dy_sig_err.sh 4
 hello! World!
 異常終了します エラーコード：127 行数：12
 
+DEBUG擬似シグナル
+入門bash P242参照
+
+RETURNシグナル
+sourceコマンドで呼ばれたシェルを終了した時に処理を実行する。
+dy_sig_rtn.sh, dy_src.sh参照。
+
+$ ./dy_sig_rtn.sh
+(実行結果)
+shell start!
+関数終了します
+hello! World!
+shell end!
