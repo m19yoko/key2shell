@@ -217,10 +217,11 @@ test "aa"="aa"
 また、testコマンドの演算子の前後にスペースを入れるとエラーになる。
 
 ・テストコマンドでの文字列比較
-[ $str1 = $str2	]	# 等しい
+[ $str1 = $str2	]		# 等しい(POSIX版)
+[ $str1 == $str2 ]	# 等しい
 [ $str1 != $str2 ]	# 等しく無い
-[ $str1 > $str2	]	# str1が大きい
-[ $str1 < $str2	]	# str2が大きい
+[ $str1 > $str2	]	# str1が語彙の順番があと
+[ $str1 < $str2	]	# str2が語彙の順番があと
 [ -n $str1 ]	# 長さ0ではない
 [ -z $str1 ]	# 長さ0である
 
@@ -239,10 +240,12 @@ test "aa"="aa"
 [ -e $file1 ]	# file1が存在する(-aと同じ)
 [ -f $file1 ]	# file1が存在し、かつファイル
 [ -r $file1 ]	# file1が読み取り可能
+[ -s $file1 ]	# file1が存在し、かつ0バイトファイルでない
 [ -w $file1 ]	# file1が書き込み可能
 [ -x $file1 ]	# file1がファイルなら実行可能、ディレクトリなら検索可能
 [ $file1 -nt $file2 ] # file1がfile2よりあたらしい
 [ $file1 -ot $file2 ] # file1がfile2より古い
+[ $file1 -ef $file2 ] # file1とfile2が同じファイルを指している
 
 ・for文の基本構文
 for 変数 in リスト; do
@@ -417,6 +420,10 @@ cat >> $msgfile <<- EOF
 	this is text of
 	our message
 EOF
+
+・標準出力、標準エラーを一つのファイルにリダイレクト
+[コマンド]  >& file1
+[コマンド] >>& file1	# 追記モード
 
 ・printf
 C言語にある、printfのような働きをするコマンド。echo文と違って自動的に改行されない。
@@ -600,3 +607,6 @@ shell start!
 関数終了します
 hello! World!
 shell end!
+
+・補完機能のカスタマイズ
+入門bash P333
