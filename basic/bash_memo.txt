@@ -137,12 +137,44 @@ echo -e ${PATH//:/'\n'}
 ・文字列の部分切り出し、置換
 ext_chg_smp.shを参照
 
+・文字列の抽出(mid、left、right)
+str="abcde"
+st_pos=2
+ed_pos=4
+cut_str=$(echo "$str" | cut -c ${st_pos}-${ed_pos}) # bcd 
+
+mid、left、right関数のサンプルは
+mid_left_right.shを参照
+
 ・文字列の長さ
 ${#var}
 
 例：
 var1="あかさたな"
 echo ${#var1}		# 5と表示される。全角も1文字でカウント。
+
+・大文字、小文字変換
+chr="LOgWrite"
+# すべて大文字化
+echo $(echo "$chr" | tr "a-z" "A-Z") # LOGWRITE
+# すべて小文字化
+echo $(echo "$chr" | tr "A-Z" "a-z") # logwrite
+
+・アスキーコードを文字に変換
+code=65
+# バックスラッシュ付きの3桁の8進数に変換
+bsla_oct=$(printf "\134%03o" $code)
+# 8進数を文字に変換
+char=$(printf ${bsla_oct}_)
+# 後ろのアンスコを取る
+char=${char%_}  # A
+
+・文字をアスキーコードに変換
+※ awkコマンドのところで落ちてしまうので、今の所使えない…
+char="B"
+code=$(echo -n "$char" | od -t uC | awk "NR==1{print \\$2}")
+[ -z "$code" ] && code=0
+
 
 ・「!」をダブルクォートで括った文字列に入れないこと
 通常のコマンド展開より、ヒストリ展開の方が早く解析されるので、だいたいエラーとなる。
@@ -151,7 +183,6 @@ echo ${#var1}		# 5と表示される。全角も1文字でカウント。
 set +H
 echo "$(echo '!')"
 set -H
-
 
 ・bashの機能拡張
 shoptコマンドのオプションをいろいろ変更すると、通常bashで出来ないことができる
@@ -433,6 +464,28 @@ names=([0]="ao" [1]="aka" [5]="midori")
 echo "${!names[@]}"  # => 0 1 5
 echo "${#names[@]}"  # => 3  配列サイズを返す
 
+・連想配列（ハッシュ）の使用
+※ 但し、bashのバージョンが4系でないと使えない。
+(サンプル)
+#!/bin/sh
+
+declare -A AREAS;
+
+AREAS=(
+  ["aichi"]="愛知県"
+  ["akita"]="秋田県"
+  ["aomori"]="青森県"
+  ["chiba"]="千葉県"
+)
+
+for AREA in ${!AREAS[@]};
+do
+	# キーを取得
+	echo "キーは$AREA"
+	# 値を取得
+	echo "値は${AREAS[$AREA]}"
+done
+
 ・ヒアドキュメント
 例：EOFまでの内容を"msgfile.txt"に出力
     EOFとEOFの間の文字列がcatの標準入力となり、$msgfileへリダイレクトする。
@@ -698,3 +751,83 @@ g_val2@tamago : shio
 end ./tamago.sh
 g_val1@niwatori : tama
 g_val2@niwatori : gyoku
+
+・bashで四捨五入する
+awkを使い、かつ0.5を足して切り捨てを行う。
+
+val1=22.5
+val2=22.55
+
+rd_val1=$(awk "BEGIN{print int($val1 + 0.5)}")
+# 小数点一桁で四捨五入する。10倍して四捨五入判定する桁が小数点第1位になるようにする。
+rd_val2=$(awk "BEGIN{print int($val2 * 10 + 0.5) / 10}")
+
+echo "rd_val1 = $rd_val1"
+echo "rd_val2 = $rd_val2"
+
+・16進数から10進数へ変換
+hex=0x41
+dec=$(printf "%d" $hex)
+echo "dec is $dec"  # 65
+
+・8進数から10進数へ変換
+oct=041		# 8進数は0を先頭につける
+dec=$(printf "%d" $oct)
+echo "dec is $dec"  # 33
+
+・10進数から16進数へ変換
+dec=254
+hex=$(printf "%x" $dec)	# %xを%Xにすると大文字になる
+echo "hex is $hex"  # fe
+
+・10進数から8進数へ変換
+dec=33		# 8進数は0を先頭につける
+oct=$(printf "%o" $dec)
+echo "oct is $oct"  # 41
+
+・2進数から10進数へ変換
+bcコマンドを使う
+bin=1111
+dec=$(echo "ibase=2; $bin" | bc)
+echo "dec is $dec"  # 15
+
+・10進数から2進数へ変換
+dec=16
+bin=$(echo "obase=2; $dec" | bc)
+echo "bin is $bin"  # 10000
+
+・数値チェック
+# 第一引数が10進数の数値がどうかチェックするサンプル。
+num_str=$1
+if [ -z $(echo "$num_str" | grep '^[0-9]\+$') ]; then
+	echo "invalid number $num_str"
+	exit 1
+fi
+
+# 第一引数が16進数の数値がどうかチェックするサンプル。
+num_str=$1
+if [ -z $(echo "$num_str" | grep '^[0-9A-Fa-f]\+$') ]; then
+	echo "invalid hex number $num_str"
+	exit 1
+fi
+
+# 第一引数が16進数の数値がどうかチェックするサンプル。
+# 先頭に0xがつくバージョン
+num_str=$1
+if [ -z $(echo "$num_str" | grep '^0x[0-9A-Fa-f]\+$') ]; then
+	echo "invalid hex number $num_str"
+	exit 1
+fi
+
+# 第一引数が8進数の数値がどうかチェックするサンプル。
+# 先頭に0がつくバージョン
+num_str=$1
+if [ -z $(echo "$num_str" | grep '^0[0-7]*$') ]; then
+	echo "invalid oct number $num_str"
+	exit 1
+fi
+
+・正規表現に関するメモ
+http://www.kt.rim.or.jp/~kbk/regex/regex.html
+
+
