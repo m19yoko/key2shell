@@ -643,4 +643,58 @@ shell end!
 ・補完機能のカスタマイズ
 入門bash P333
 
+・子プロセスに変数を渡す（exportする）
+基本、exportしないと、子プロセスに渡した変数を参照できない。
 
+(niwatori.sh)
+#!/bin/sh
+
+l_val="sato"
+g_val="shio"
+
+# 変数を環境変数化
+export g_val
+
+# 子プロセス起動
+./tamago.sh
+
+echo "l_val@niwatori : $l_val"
+echo "g_val@niwatori : $g_val"
+
+(tamago.sh)
+#!/bin/sh
+# 子プロセス
+echo "start $0"
+
+echo "l_val@tamago : $l_val"
+echo "g_val@tamago : $g_val"		# 起動時の変数内容を確認
+
+l_val="tama"
+g_val="gyoku"
+
+export g_val
+
+echo "end $0"
+
+(実行結果)
+$ ./niwatori.sh
+start ./tamago.sh
+l_val@tamago :
+g_val@tamago : shio
+end ./tamago.sh
+l_val@niwatori : sato
+g_val@niwatori : shio	# 子プロセスで設定した内容はグローバルでも親からは参照できない
+
+・子プロセスから親プロセスへに変数を渡す
+一時ファイルに変数の内容を格納して受け渡しを行う。
+niwatori.sh、tamago.sh参照。
+参照元のシェルスクリプトシンプルレシピ　レシピ2.5は動かないので注意。
+
+(実行結果)
+$ ./niwatori.sh
+start ./tamago.sh
+g_val1@tamago : sato
+g_val2@tamago : shio
+end ./tamago.sh
+g_val1@niwatori : tama
+g_val2@niwatori : gyoku
