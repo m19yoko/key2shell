@@ -170,9 +170,8 @@ char=$(printf ${bsla_oct}_)
 char=${char%_}  # A
 
 ・文字をアスキーコードに変換
-※ awkコマンドのところで落ちてしまうので、今の所使えない…
 char="B"
-code=$(echo -n "$char" | od -t uC | awk "NR==1{print \\$2}")
+code=$(echo -n "$char" | od -t uC | awk "NR==1{print \$2}")
 [ -z "$code" ] && code=0
 
 
@@ -830,4 +829,70 @@ fi
 ・正規表現に関するメモ
 http://www.kt.rim.or.jp/~kbk/regex/regex.html
 
+・bashでの正規表現
+version="4.10.1"
+
+if [[ ${version} =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+  all=${BASH_REMATCH[0]}
+  major=${BASH_REMATCH[1]}
+  minor=${BASH_REMATCH[2]}
+  patch=${BASH_REMATCH[3]}
+
+  echo ${all}    # 4.10.1
+  echo ${major}  # 4
+  echo ${minor}  # 10
+  echo ${patch}  # 1
+fi
+
+※ポイント
+ 比較部分は[[ ]]で囲む
+ 比較部分は~=
+ 右辺の正規表現部分は""で囲わない
+ ${BASH_REMATCH[0]} にはマッチした文字列全体が入る
+ カッコで囲った部分が ${BASH_REMATCH[1]} 以降順番に得られる
+
+・トリム関数
+# Trim関数
+#  第一引数：trimされる文字列
+#  第二引数：trimする文字(但し、^を指定する場合は\^と指定する)
+trim()
+{
+	local str=$1
+	local trim_chr=$2
+
+	while [ "_$str" != "_${str#[$trim_chr]}" ]; do
+		str="${str#[$trim_chr]}"
+	done
+	
+	while [ "_$str" != "_${str%[$trim_chr]}" ]; do
+		str="${str%[$trim_chr]}"
+	done
+	echo $str
+}
+
+str="---Miso-Ramen---"
+
+echo "もとの文字：$str"   # ---Miso-Ramen---
+str=$(trim $str "-")
+echo "トリム後：$str"	# Miso-Ramen
+
+※スペース、タブを入り混じったものを削除する場合は、trim関数の第二引数に以下を指定
+ $(printf " \t")
+
+・ランダムな文字列生成
+　シェルスクリプトシンプルレシピ 4.8参照
+
+・引数処理の例
+　シェルスクリプトシンプルレシピ 5.1参照
+
+・最後からn番目のフィールドを得る
+rec="aaa	vfsdf	234	56"
+# 最後から２番目のフィールド抽出
+# 最後から、というコマンドはないのでフィールド数(NF)から先頭より何番目からを計算する
+field=$(echo "$rec" | awk "{num=(NF+1)-2; print \$num}")
+echo $field		# 234
+
+・一行ごとに処理する
+  psの結果を一行ごとに処理する。（proclist.sh参）
+  シェルスクリプトシンプルレシピ P63〜67も参照。
 
