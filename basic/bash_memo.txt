@@ -973,3 +973,10 @@ for line in $(find $PWD); do
 	fi
 done
 
+・外部ファイルのヒアドキュメント
+  シェルスクリプトシンプルレシピ 6.7参照
+
+・現在のプロセス数を知る
+CMD_PS="ps axww"
+PS_NUM=$($CMD_PS | grep '^[[:space:]]*[[:digit:]]\+\|PLEASE_NOCOUNT' | grep -v "${0##*/}\|${CMD_PS}\|PLEASE_NOCOUNT" | wc -l)
+
