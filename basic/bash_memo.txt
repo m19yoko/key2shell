@@ -999,3 +999,6 @@ cat abc.sh | tee /dev/stderr | wc -c
 
 ※この応用として、シェルスクリプトシンプルレシピ 8.4参照
 
+・Web巡回（スクレイピング）シェル
+web_scr/web_scraping.sh を参照
+
