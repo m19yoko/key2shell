@@ -1,0 +1,187 @@
+●置き換え変数(バインド変数)
+
+dが格納されていたとします。
+以下のコマンドファイルを実行すると
+
+select &col
+from tbl_employee
+where rownum <= 1;
+                                                 
+このコマンドファイルは以下のように解釈されて実行されます。
+select emp_id
+from tbl_employee
+where rownum <= 1;
+                                                 
+置き換え変数が未定義の場合は。
+
+SQL> select &col
+  2  from tbl_employee
+  3  where rownum <=1;
+  colに値を入力してください: emp_id
+
+EMP_ID
+******
+000001
+
+SQL>
+                                                 
+というように置き換え変数に何を格納するかを求めるプロンプトが表示されます。この置き換え変数には任意の文字列を格納することができますので、上記ではemp_idと入力してEnterを押しています。
+
+置き換え変数に文字列を連結したい場合、以下のように置き換え変数と文字列をドット（.）で連結します。
+
+SQL> select emp_id
+  2  from tbl_employee
+  3  where rownum <=&num.0;
+  numに値を入力してください: 1
+
+
+EMP_ID
+******
+000001
+000002
+000003
+000004
+000005
+000006
+000007
+000008
+000009
+000010
+
+SQL>
+                                                 
+最初にも言いましたが、置き換え変数にはコマンドファイル中のユーザ変数名の前に&を二つ付けた変数があります。
+この置き換え変数は、コマンドファイルを1回実行すると、その置き換え変数に入力した値が、そのSQL*Plusセッション中でユーザ変数として定義されます。
+上記例の&numを&&numに変更し、実行します。そして例のとおり1を入力します。
+するとユーザ変数numが1として定義されます。&が一つの場合はユーザ変数として定義はされません。
+試しに、 define num と入力すると
+
+SQL> define num
+DEFINE NUM               = "1" (CHAR)
+SQL>
+                                                 
+というように定義されているのがわかります。
+
+●SQLPlusでの定数宣言(DEFINE)
+
+DEFINEコマンドを使う。
+
+例)
+SQL> variable bind_num    number
+SQL> define   define_num = 999
+SQL> EXECUTE :bind_num := &define_num ;
+---
+SQL> PRINT :bind_num
+  BIND_NUM
+----------
+       999
+
+●SQLPlus上から変数設定してストアド呼び出し
+
+-- バインド変数の宣言
+VARIABLE g_telno VARCHAR2(30)
+-- 変数へ値代入
+EXECUTE :g_telno := '12345678901'
+
+PL/SQLプロシージャが正常に完了しました
+
+-- ストアド呼び出し
+EXECUTE change_tel(:g_telno)
+
+PL/SQLプロシージャが正常に完了しました
+
+PRINT g_telno
+
+G_TELNO
+----------------------------------------
+(123)4567-8901
+
+●SQLPlusでCLOBを表示
+
+これをSQLPlusで実行すれば、2GBぐらいまで見ることができる。
+
+set pages 50000
+
+set long 2000000000
+
+●VARIABLEコマンド
+SQLPlusで変数を宣言して、それをストアドに渡したりできる。
+無名ブロック内で使うには、「:」が必要。
+
+以下のデータ型の宣言が出来る。
+NUMBER, BINARY_FLOAT, BINARY_DOUBLE
+CHAR, CHAR(n), NCHAR, NCHAR(n) 
+VARCHAR2(n), NVARCAR2(n)
+CLOB, NLOB
+REFCURSOR
+
+※DATE型が使えないことに注意。
+
+例:)
+SQL> VARIABLE g_telno VARCHAR2(30)
+SQL> EXECUTE :g_telno := '123456789'   --変数に代入
+
+SQL> EXECUTE change_tel(:g_telno)    --ストアドプロシージャを実行
+
+SQL> PRINT g_telno
+（変数 g_telnoの中身を表示）
+
+例その２:)
+
+set serveroutput on
+variable cv REF CURSOR   --REF CURSOR型で変数宣言
+
+--無名ブロックでストアドを呼ぶ
+DECLARE 
+    v_emp employee%ROWTYPE;
+BEGIN
+    --
+REF CURSOR型を引数としてempsパッケージのストアドproc1を呼ぶ
+    --ストアド内では、SQL文を指定してカーソルをオープンしているだけ
+    emps.proc1(100, :cv);
+    --FETCHする
+    FETCH :cv INTO v_emp;
+    DBMS_OUTPUT.PUTLINE(v_emp.firstname);
+    CLOSE :cv;
+END;
+/
+
+●SHOW ERRORSコマンド
+SQLPlusのコマンド。
+最後に発生したコンパイルエラー表示する
+
+SHOW ERRORS 種類 オブジェクト名
+
+とすれば、指定されたオブジェクトのコンパイルエラーを表示する。
+
+データディクショナリのUSER_ERRORSビューを参照しても確認できるが、
+SHOW ERRORSコマンドのほうが確認しやすい。
+
+●バインド変数と置換変数
+---  バインド変数へユーザー定義変数(置換変数)を代入するのは簡単
+SQL> variable bind_num    number
+SQL> define   define_num = 999
+SQL> EXECUTE :bind_num := &define_num ;
+---
+SQL> PRINT :bind_num
+  BIND_NUM
+----------
+       999
+
+---  ユーザー定義変数(置換変数)へバインド変数を代入
+-- 準備
+SQL> variable bind_num    number
+SQL> EXECUTE :bind_num := 777;
+...
+-- SQL と COLUMN コマンドを使ってユーザー変数に代入
+SQL> COLUMN num_alias NEW_VALUE define_num NOPRINT
+SQL> SELECT :bind_num num_alias FROM DUAL ;
+...
+SQL> DEFINE define_num
+DEFINE DEFINE_NUM      =        777 (NUMBER)
+
+●セッション毎の日付表示フォーマットを変更する
+
+SQL> ALTER SESSION
+       SET nls_date_format = 'yyyy/mm/dd hh24:mi:ss';
+

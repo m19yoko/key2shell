@@ -1,0 +1,179 @@
+●DBに作成されているDDL文を取得する
+
+データベースに作成されている、テーブルやビュー定義などのＤＤＬ文を取得するには、DBMS_METADATA.GET_DDLを使用します。
+
+DBMS_METADATA.GET_DDL( オブジェクトタイプ ,　オブジェクト名 , [ スキーマ ] )
+指定されたオブジェクトのＤＤＬ文を取得します。
+
+オブジェクトタイプ　：　TABLE、VIEWなどの取得するオブジェクトの種類
+オブジェクト名　：　テーブル名、ビュー名などのオブジェクト名
+スキーマ　：　オブジェクトの所有者。デフォルトは、ログイン中のユ－ザー
+
+※引数の指定は、全て大文字で指定します
+
+
+例１）　表「emp」のＤＤＬ文を取得します。
+SQL> set long 2000
+SQL> set heading off
+SQL>
+SQL> select
+　2　　 dbms_metadata.get_ddl('TABLE','EMP')
+　3 　　from dual;
+
+CREATE TABLE "TEST"."EMP"
+( 　 "EMP_ID" CHAR(5),
+　　"DEPT_ID" CHAR(5),
+　　"EMP_NAME" VARCHAR2(10),
+　　"EMP_DATE" DATE,
+　　"SALARY" NUMBER(5,0),
+PRIMARY KEY ("EMP_ID")
+USING INDEX PCTFREE 10 INITRANS 2 MAXTRANS 255
+STORAGE(INITIAL 65536 NEXT 1048576 MINEXTENTS 1 MAXEXTENTS 2147483645
+PCTINCREASE 0 FREELISTS 1 FREELIST GROUPS 1 BUFFER_POOL DEFAULT)
+TABLESPACE "USERS" ENABLE
+) PCTFREE 10 PCTUSED 40 INITRANS 1 MAXTRANS 255 NOCOMPRESS LOGGING
+
+STORAGE(INITIAL 65536 NEXT 1048576 MINEXTENTS 1 MAXEXTENTS 2147483645
+PCTINCREASE 0 FREELISTS 1 FREELIST GROUPS 1 BUFFER_POOL DEFAULT)
+TABLESPACE "USERS"
+
+
+
+例２）　ログイン中のユーザーの全ての表のDDL文をファイル「create_table.sql」に出力する。
+set long 2000
+set heading off
+set line 120
+set pages 2000
+set long 2000
+set heading off
+set trimspool off
+set feedback off
+set longchunksize 600
+
+EXEC DBMS_METADATA.SET_TRANSFORM_PARAM(
+DBMS_METADATA.SESSION_TRANSFORM,'SQLTERMINATOR',TRUE)
+
+spool create_table.sql
+
+select
+dbms_metadata.get_ddl('TABLE',table_name)
+from user_tables;
+
+spool off;
+
+
+EXEC DBMS_METADATA.SET_TRANSFORM_PARAMで、各DDL文の最後に、セミコロン(;)が出力されます。
+
+※Oracle9iではインデックスが貼られてないテーブルの情報を取得することができないらしい。10gでは不明。
+
+●plshprofコマンド
+(11g以降？）
+plshprofは、コマンドラインユーティリティで、未処理のプロファイルデータからHTMLレポートを生成することができます。
+
+$ plshprof -output proc1 proc1.txt
+
+PLSHPROF: Oracle Database 11g Enterprise Edition Release 11.1.0.7.0 - Production
+[18 symbols processed]
+[Report written to 'proc1.html']
+
+$ ls
+proc1.html     proc1_2f.html  proc1_md.html  proc1_nsc.html  proc1_pc.html  proc1_tf.html
+proc1.txt      proc1_2n.html  proc1_mf.html  proc1_nsf.html  proc1_tc.html  proc1_ts.html
+proc1_2c.html  proc1_fn.html  proc1_ms.html  proc1_nsp.html  proc1_td.html
+
+-outputにて出力するHTMLファイルの接頭辞を指定し、読み込む未処理のプロファイルを指定すると、現行ディレクトリにHTMLファイルが出力されます。<接頭辞>.htmlを開くことで、全体のサマリーや追加情報へのリンクを含むページが表示されます。
+
+●結果キャッシュ
+11gから使用可能になったらしい。
+
+DBMS_RESULT_CACHEパッケージは、SQLの結果キャッシュおよびPL/SQLファンクションの結果キャッシュによって使用される共有プールの一部をDBAが管理するためのインタフェースを提供します。これらのキャッシュは同じインフラストラクチャを使用します。 このため、たとえば、DBMS_RESULT_CACHE.BYPASSでは、両方のキャッシュに対してバイパスまたは使用が設定され、DBMS_RESULT_CACHE.FLUSHでは、SQL文の問合せおよびPL/SQLファンクションの両方について、キャッシュされた結果がすべてフラッシュされます。
+
+●OracleのBFile型
+データベース外に保存される大きなバイナリ・ファイルへのロケータ(ポインタのようなもの)を格納するデータ型です。
+
+LOBデータ型を扱う場合、LOB値に対するポインタであるロケータを使用します。
+データベース表でLOBデータ型の列を定義した場合、列値にロケータが格納され、
+表とは別のLOBセグメントにLOB値が格納されます。
+列値を格納するときにLOB値を同時に格納するように指定すれば、
+ロケータが自動的に作成されますが、初期化(空のロケータのみを作成)する場合は、
+EMPTY_BLOB(BLOBの場合)とEMPTY_CLOB(CLOB、NCLOBの場合)を使用します。
+
+最大サイズは4GBです。
+
+●viewの更新不可能列を確認する
+viewの更新不可能列を探すには、user_updatable_columnsデータディクショナリを参照する 
+
+SQL> desc user_updatable_columns
+ 名前 NULL? 型
+ ----------------------------------------- -------- ---------------------
+ OWNER NOT NULL VARCHAR2(30)                -- スキーマ名
+ TABLE_NAME NOT NULL VARCHAR2(30)      -- テーブル名
+ COLUMN_NAME NOT NULL VARCHAR2(30)      -- 列名
+ UPDATABLE VARCHAR2(3)           -- 更新可能列かどうか
+ INSERTABLE VARCHAR2(3)           -- 挿入可能列かどうか
+ DELETABLE VARCHAR2(3)           -- 削除可能列かどうか
+SQL>
+
+●内部LOBを持つテーブルの作成例
+CREATE TABLE emp_rep(
+    emp_no NUMBER(4),
+    ename VARCHAR2(10),
+    report CLOB,
+    pict BLOB)
+LOB (report) STORE AS report_seg (TABLESPACE data01)
+LOB (pict) STORE AS (TABLESPACE data01)
+
+report列をreport_segセグメントに格納し、表領域data01に格納。
+pict列を表領域data01に格納。セグメント名は省略されているので、Oracleが自動生成する。
+表領域、セグメント名ともに省略すると、テーブルと同じ表領域に作成される。
+
+●内部LOBと外部LOB
+内部LOB型
+CLOB....文字データを格納
+NLOB....各国キャラクタセット(Unicode)による文字データを格納
+BLOB....バイナリデータを格納
+
+外部LOB型
+BFILE....OSのファイルシステム格納されたバイナリデータへのポインタ
+
+●LONG型をCLOB型に変更
+--テーブルemp_logのlong_data列をCLOB型に変更
+ALTER TABLE emp_log MODIFY (long_data CLOB);
+
+●コレクションの性質
+ネストした表の場合は、明示的にネストした表セグメントを定義することができますが、
+VARRAYは同じ表領域に自動的に格納されています。4000バイト未満であれば、表内に要素が格納されます。
+より少ないディスクアクセスにてVARRAYの格納や取得ができることから、効率的なアクセスが必要であればVARRAYを検討します。
+ネストした表であれば要素の削除ができますが、VARRAYは削除ができません。
+そのため、削除する必要がない場合にVARRAYを使用します。
+要素の削除を行った場合、DBMS_SESSION.FREE_UNUSED_USER_MEMORYプロシージャをコールすることで、
+使用されていないメモリの開放が可能です。
+
+●raw型
+RAWデータ型はバイナリ・データやバイト列を格納するために使用します。
+たとえば、RAW型変数には図形文字の並びやデジタル化された絵を格納できます。RAWデータはVARCHAR2データと似ていますが、PL/SQLによって解釈されない点が異なります。
+また、RAWデータをシステム間で送信する際に、Oracle Netはキャラクタ・セット変換を実行しません。
+RAWデータ型は必須パラメータを使用して、その最大サイズを32767バイトまで指定できます。次に構文を示します。
+RAW(maximum_size)最大サイズには1～32767の範囲の整数リテラルを指定します。シンボリック定数や変数は指定できません。
+
+●DDLトリガー
+DDL走破で起動するトリガー。
+ALTER、CREATE、NOAUDIT、TRUNCATE、ANALIZE、DROP、PURGE
+AUDIT、FLASHBACK、RENAME、COMMENT、GRANT、REVOKEなどがある。
+
+SELECT trigger_name, trigger_type, table_name, status
+FROM user_triggers;
+ 
+TRIGGER_NAME                   TRIGGER_TYPE     TABLE_NAME
+------------------------------ ---------------- ------------------------------
+STATUS
+--------
+CHECK_SAL                      BEFORE EACH ROW  EMP
+ENABLED
+
+EMP_NOMOD                      BEFORE STATEMENT EMP
+ENABLED
+
+MODIFY_EMP                     AFTER EACH ROW   EMP
+ENABLED
+

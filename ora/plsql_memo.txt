@@ -1,0 +1,3723 @@
+●TO_CHAR、TO_DATEの書式
+
+TO_CHAR(日付データ, 日付書式)
+TO_DATE(文字列, 日付書式)
+
+YYYY   西暦4桁
+YY      西暦下2桁
+MM    月(01〜12)
+DD     日(01〜31)
+DDD  年の初めからの日数(1〜366)
+HH24   時間(00〜23)
+MI　　分(00〜59)
+SS      秒(00〜59)
+
+例：システム日付（TIMESTAMP型）を、
+年/月/日 時(24時):分:秒.ミリ秒(3桁)　に変換する
+select
+　to_char(systimestamp,'yyyy/mm/dd hh24:mi:ss.ff3')
+from dual;
+
+結果は、2006/03/29 21:54:31.078　のようになります
+
+例：システム日付（DATE型）を、和暦変換する（TO_CHAR）
+select
+　to_char(sysdate,'eeyy/mm/dd hh24:mi:ss','nls_calendar = ''Japanese Imperial''')
+from dual;
+
+結果は、平成18/03/30 00:59:29　のようになります
+
+●バルクバインドでRETURNING INTO句を使ったサンプル
+
+--バルクバインドでRETURNING INTO句を使ったサンプル
+--削除されたレコードのemp_no列のコレクションを取得
+
+DECLARE
+    TYPE tab_rec IS TABLE OF emp.empno%TYPE
+        INDEX BY PLS_INTEGER;
+    emp_no tab_rec;
+BEGIN
+    DELETE FROM emp WHERE deptno = 20
+        RETURNING empno BULK COLLECT INTO emp_no;
+        
+    FOR i IN emp_no.FIRST..emp_no.LAST LOOP
+        DBMS_OUTPUT.PUT_LINE(emp_no(i));
+    END LOOP;
+END;
+/
+
+●ネストした表、VARRAY型を確認
+
+ネストした表、VARRAY型を確認
+
+USER_TYPESビューを確認する。
+
+列名
+TYPE_NAME ... 型の名前
+TYPECODE ... 型のタイプ(COLLECTION, OBJECTなど)
+
+●パラメータ付きカーソルの見本
+
+set serveroutput on
+DECLARE
+  CURSOR emp_cur(d_no NUMBER) IS
+    SELECT empno, ename
+    FROM emp
+    WHERE deptno = d_no;
+  d_var NUMBER;
+BEGIN
+  d_var := &DEPTNO;
+  FOR emp_rec IN emp_cur(d_var) LOOP
+  DBMS_OUTPUT.PUT_LINE(emp_rec.empno || ' ' || emp_rec.ename);
+  END LOOP;
+
+END;
+/
+
+※実行結果
+SQL> @C:\Home\Src\PLSQL\paramcursol.sql
+deptnoに値を入力してください: 20
+旧 8: d_var := &DEPTNO;
+新 8: d_var := 20;
+7369 SMITH
+7566 JONES
+7788 SCOTT
+7876 ADAMS
+7902 FORD
+
+PL/SQLプロシージャが正常に完了しました。
+
+●EXIT WHENのサンプル
+
+set serveroutput on
+
+DECLARE
+     c_count PLS_INTEGER := 0;
+BEGIN
+LOOP
+    --カウンタが3になったら抜ける。
+    EXIT WHEN c_count = 3;
+    c_count := c_count + 1;
+    DBMS_OUTPUT.PUT_LINE('HELLO WORLD');
+END LOOP;
+END;
+/
+
+●半角英数を全角英数に変換する
+TO_MULTI_BYTE('文字')
+
+●CLOB列を参照して出力
+SET SERVEROUTPUT ON
+
+DECLARE
+
+    V_CLOB_DATA CLOB;
+    V_CLOB_BUFFER VARCHAR2(32767);
+    V_FILE_SIZE INTEGER;
+    V_START_POINT INTEGER := 1;
+    V_WRITE_SIZE INTEGER := 32767;
+
+BEGIN
+
+     -- CLOBデータ列「FILEDATA」のロケータを「V_CLOB_DATA」に代入する 
+     SELECT DOWNLOAD_SQL INTO V_CLOB_DATA FROM ACCESS_LOG WHERE ACCESS_LOG_ID = 1;
+
+     -- CLOBデータのサイズを取得する 
+     V_FILE_SIZE := DBMS_LOB.GETLENGTH(V_CLOB_DATA);
+     
+     IF V_FILE_SIZE > 32767 THEN
+      V_WRITE_SIZE := 32767;
+     ELSE
+        V_WRITE_SIZE := V_FILE_SIZE;
+     END IF;
+
+     IF V_FILE_SIZE = 0 THEN
+      DBMS_OUTPUT.PUT_LINE('データは格納されてません。');
+     ELSE
+   -- CLOBデータを先頭からCLOBデータサイズ読み込み、「V_CLOB_BUFFER」に代入
+      DBMS_LOB.READ(V_CLOB_DATA, 
+                    V_WRITE_SIZE, 
+                    1, 
+                    V_CLOB_BUFFER);
+
+      DBMS_OUTPUT.PUT_LINE(V_CLOB_BUFFER);
+ END IF;
+END;
+/
+SHOW ERRORS
+
+●CLOBをVARCHR2に変換するストアドファンクション
+CREATE OR REPLACE FUNCTION CLOB_TO_CHAR(DT IN CLOB) RETURN VARCHAR2
+IS
+    V_CLOB_BUFFER VARCHAR2(32767) := '';
+    V_DT_SIZE INTEGER;
+    V_WRITE_SIZE INTEGER := 32767;
+BEGIN
+     -- CLOBデータのサイズを取得する 
+     V_DT_SIZE := DBMS_LOB.GETLENGTH(DT);
+     
+     IF V_DT_SIZE > 3600 THEN
+        V_WRITE_SIZE := 3600;
+     ELSE
+        V_WRITE_SIZE := V_DT_SIZE;
+     END IF;
+
+     IF V_DT_SIZE = 0 THEN
+        V_CLOB_BUFFER := '(NULL)';
+     ELSE
+         -- CLOBデータを先頭からCLOBデータサイズ読み込み、「V_CLOB_BUFFER」に代入
+         DBMS_LOB.READ(DT, 
+                       V_WRITE_SIZE, 
+                       1, 
+                       V_CLOB_BUFFER);
+         return V_CLOB_BUFFER;
+    END IF;
+    RETURN V_CLOB_BUFFER;
+END;
+/
+SHOW ERRORS
+
+●PL/SQLのデバック
+(10g以降）PL/SQLプログラムのトレースを行う場合、PLSQL_DEBUG初期化パラメータをTRUEに設定してからコンパイルを行うか、DEBUGコンパイラオプションを使用して再コンパイルを行います。
+
+ALTER PROCEDURE proc1 COMPILE DEBUG;
+
+DEBUGコンパイラオプションを有効化し、DBMS_TRACEパッケージにてトレースレベルを設定し、トレースを有効化したプログラムを実行することで、PLSQL_TRACE_RUNSビューとPLSQL_TRACE_EVENTSビューにトレース結果が記録されます。ただし、各ビューは、tracetab.sqlを実行しておく必要があります。
+tracetab.sqlが、トレース結果を格納するテーブルを生成する。
+
+DBMS_TRACE.SET_PLSQL_TRACEプロシージャでは、次のトレースレベルが設定できます。
+
+●コール
+─trace_all_calls:すべてのコールをトレース
+─trace_enable_calls:有効化されたプログラムユニットに対するコールのみをトレース
+
+●例外
+─tracl_all_exceptions:すべての例外をトレース
+
+─trace_enabled_exceptions:有効化されたプログラムユニットで発生した例外のみをトレース
+
+●SQL
+─trace_all_sql:すべてのSQLをトレース
+─trace_enabled_sql:有効化されたプログラムユニットのSQLのみをトレース
+
+●コード行
+─tracl_all_lines:すべてのコード行をトレース
+─trace_enabled_lines:有効化されたプログラムユニットのコード行のみをトレース
+
+execute DBMS_TRACE.SET_PLSQL_TRACE(DBMS_TRACE.TRACE_ALL_CALLS)
+
+●ストアドのソースコード確認
+SQL> col text format a80
+SQL>
+SQL> select text from user_source
+  2 where name = 'TRIANGLE'      --ストアド名は大文字で指定
+  3 order by line;
+TEXT
+-------------------------------------------------------------------------------
+PROCEDURE triangle(base NUMBER DEFAULT 10,
+                                     height NUMBER DEFAULT 20)
+IS
+    area NUMBER;
+BEGIN
+        area := (base * height)/2;
+        DBMS_OUTPUT.PUT_LINE(area);
+END;
+8行が選択されました。
+SQL>
+
+●例外のトレース
+PL/SQL実行のトレースにて、例外をトレースすると、例外番号、例外名の出力もトレースできます。
+CREATE OR REPLACE PROCEDURE proc1
+AS
+BEGIN
+  NULL;
+  RAISE ZERO_DIVIDE;
+END;
+
+上記のコードでは、実行するとゼロで除算エラーが発生します。
+ALTER PROCEDURE proc1 COMPILE DEBUG;
+execute DBMS_TRACE.SET_PLSQL_TRACE(DBMS_TRACE.TRACE_ENABLED_EXCEPTIONS)
+
+DEBUGモードでコンパイル後、TRACE_ENABLED_EXCEPTIONSにて例外のトレースを有効化し、proc1プロシージャを実行します。
+<pre><font face="ＭＳ ゴシック">execute proc1
+BEGIN proc1; END;
+*
+行1でエラーが発生しました。:
+ORA-01476: 除数がゼロです。
+ORA-06512: "OE.PROC1", 行5
+ORA-06512: 行1
+
+execute DBMS_TRACE.CLEAR_PLSQL_TRACE
+PLSQL_TRACE_EVENTSビューにて結果を確認すると、ERRORSTACK列にて例外名、EXCP列にてエラーコードを確認できます。
+SELECT proc_name,proc_line,event_proc_name,stack_depth,errorstack,excp,event_comment FROM sys.plsql_trace_events;
+
+PROC_NAME PROC_LINE EVENT_PROC_NAME STACK_DEPTH ERRORSTACK             EXCP EVENT_COMMENT
+--------- --------- --------------- ----------- -------------------- ------ ---------------
+                                                                            PL/SQL Trace Tool started
+                                                                            Trace flags changed
+                                                                            PL/SQL Virtual Machine stopped
+                                              0                             PL/SQL Virtual Machine started
+                    PROC1                     2 ORA-01476: 除数がゼ    1476 Exception raised
+                                                ロです。
+
+
+                                                                            Some NODEBUG events skipped
+                                                                            PL/SQL Virtual Machine stopped
+                                              0                             PL/SQL Virtual Machine started
+                                                                            PL/SQL Virtual Machine stopped
+                                              0                             PL/SQL Virtual Machine started
+                                                                            PL/SQL trace stopped
+
+●バルク動的SQL文のサンプル(RETURNING BULK COLLECT INTO)
+
+--影響を受けた行のename列のコレクションを取得
+ 
+CREATE OR REPLACE PROCEDURE bulk_returning(e_sal NUMBER,
+                                           clause VARCHAR2)
+IS
+    TYPE empname IS TABLE OF emp.ename%TYPE
+        INDEX BY PLS_INTEGER;
+    e_name empname;
+BEGIN
+    EXECUTE IMMEDIATE 'UPDATE emp SET sal = :1 ' ||
+                      'WHERE ' || clause || ' RETURNING ename INTO :2'
+    USING e_sal RETURNING BULK COLLECT INTO e_name;
+
+    FOR i IN e_name.FIRST..e_name.LAST LOOP
+        DBMS_OUTPUT.PUT_LINE(e_name(i));
+    END LOOP;
+END;
+/
+show errors
+ 
+(実行結果)
+SQL> execute bulk_returning(3000, 'deptno = 20')
+SMITH
+JONES
+SCOTT
+ADAMS
+FORD
+
+PL/SQLプロシージャが正常に完了しました。
+
+●バルクバインドでLIMIT句を使用したサンプル
+--10000レコードずつFetchする
+ 
+DECLARE
+    TYPE cust_type IS TABLE OF cust%ROWTYPE
+        INDEX BY PLS_INTEGER;
+    cust_tab cust_type;
+    CURSOR cust_cl IS SELECT * FROM cust;
+BEGIN
+    OPEN cust_cl;
+    LOOP     
+        FETCH cust_cl BULK COLLECT INTO cust_tab LIMIT 10000;
+        EXIT WHEN cust_cl%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE(cust_tab.count || ' ROW');
+    END LOOP;
+    CLOSE cust_cl;
+        
+END;
+/
+(実行結果)
+SQL> @C:\Home\Src\PLSQL\BulkCollectIntoLimitedSample.sql
+10000 ROW
+10000 ROW
+10000 ROW
+
+PL/SQLプロシージャが正常に完了しました。
+
+●ストアドの一覧を取得
+-- スキーマが保有するストアドの一覧を取得
+SELECT object_name, object_type, status
+FROM user_objects 
+WHERE object_type in ('PROCEDURE','FUNCTION')
+ORDER BY object_name;
+
+実行例：
+SQL>
+SQL> column OBJECT_NAME format a30
+SQL>
+SQL> set pagesize 150
+SQL>
+SQL> r
+  1 SELECT object_name, object_type, status
+  2 FROM user_objects
+  3 WHERE object_type in ('PROCEDURE','FUNCTION')
+  4* ORDER BY object_name
+OBJECT_NAME                    OBJECT_TYPE         STATUS
+------------------------------ ------------------- -------
+ALERT_SENT                     PROCEDURE           VALID
+BULK_RETURNING                 PROCEDURE           VALID
+CALLEMP                        PROCEDURE           VALID
+CALLEMP_NEST                   PROCEDURE           VALID
+DELETE_TABLE                   PROCEDURE           VALID
+DEL_CASCADE                    PROCEDURE           VALID
+DEPTREE_FILL                   PROCEDURE           VALID
+FILE_UNLOAD_DEPT               PROCEDURE           VALID
+F_IOTEST                       FUNCTION            VALID          
+INOUTPROC                      PROCEDURE           VALID
+OPEN_DATA                      PROCEDURE           VALID
+OPEN_EMP                       PROCEDURE           VALID
+PIPE_SENT                      PROCEDURE           VALID
+SELECT_DEPT                    PROCEDURE           VALID
+TRIANGLE                       PROCEDURE           VALID
+16行が選択されました。
+SQL>
+
+●FORALLでエラーになった行を拾う
+FORALLによるバルクバインドの実行中に発生した例外は、レコードのコレクションを格納するSQL%BULK_EXCEPTIONSカーソル属性に格納されます。
+レコードは、ERROR_INDEXとERROR_CODEの2つのフィールドで構成されます。
+
+●ERROR_INDEX:例外が発生したFORALL内の要素の位置
+●ERROR_CODE:例外となったときのエラーコード
+>SQL> DECLARE
+  2 TYPE num_typ IS TABLE OF NUMBER;
+  3 nums num_typ := num_typ(100,0,110,300,0,199,200,0,400);
+  4 blk_errs EXCEPTION;
+  5 PRAGMA EXCEPTION_INIT(blk_errs,-24381);
+  6 BEGIN
+  7      FORALL i IN nums.FIRST .. nums.LAST
+  8      SAVE EXCEPTIONS
+  9      DELETE FROM orders WHERE order_total<500000/nums(i);
+ 10 EXCEPTION
+ 11 WHEN blk_errs THEN
+ 12      DBMS_OUTPUT.PUT_LINE('Errors:'||SQL%BULK_EXCEPTIONS.COUNT);
+ 13      FOR j IN 1..SQL%BULK_EXCEPTIONS.COUNT LOOP
+ 14      DBMS_OUTPUT.PUT_LINE(
+ 15           TO_CHAR(SQL%BULK_EXCEPTIONS(j).ERROR_INDEX)||'/'||
+ 16           SQLERRM(-SQL%BULK_EXCEPTIONS(j).ERROR_CODE));
+ 17      END LOOP;
+ 18 END;
+ 19 /
+Errors :3
+2/ORA-01476: 除数がゼロです。
+5/ORA-01476: 除数がゼロです。
+8/ORA-01476: 除数がゼロです。
+
+12行目のエラー発生数は、0の個数と一致しています。SAVE EXCEPTIONS句を指定しておくことで、FORALL中の例外があってもループを継続することができます。そのため、SQL%BULK_EXCEPTIONSカーソル属性は、複数行が格納できるコレクションになっています。
+
+SAVE EXCEPTIONS句を指定しない場合、SQL%BULK_EXCEPTIONS.COUNTによる例外数は常に1を戻し、最後の1つのレコードのみが格納されます。例外が発生しなかった場合は、SQL%BULK_EXCEPTIONS.COUNTは0を戻します。
+
+●共有プールにストアドを固定する
+共有プールにストアドを固定する
+ 
+DBMS_SHARED_POOLパッケージを使用する
+デフォルトではインストールされていないので、SYSユーザでインストールする
+ 
+SQL> conn sys/orcl as sysdba
+接続されました。
+SQL> @%ORACLE_HOME%\rdbms\admin\dbmspool.sql
+
+パッケージが作成されました。
+
+権限付与が成功しました。
+ 
+# スキーマ名.オブジェクト名と、オブジェクトの種類を指定する
+# プロシージャ、ファンクションの場合は'P'
+# トリガーの場合は'R'
+SQL> execute DBMS_SHARED_POOL.KEEP('scott.open_emp','P')
+
+PL/SQLプロシージャが正常に完了しました。
+ 
+# 実際に共有メモリに固定されたかどうか確認する
+SQL> col owner format a10
+SQL> col name format a12
+SQL> set lin 120
+SQL>
+SQL>
+SQL> SELECT owner,name,type,sharable_mem,loads,kept
+  2 FROM v$db_object_cache
+  3 WHERE owner = 'SCOTT' and TYPE = 'PROCEDURE';
+OWNER      NAME         TYPE        SHARABLE_MEM LOADS      KEP
+---------- ------------ ----------- ------------ ---------- ---
+SCOTT      OPEN_EMP     PROCEDURE   13694        1          YES
+SQL>
+SQL> 
+# kept列がYESの場合は、共有プールに固定されている
+# Oracleが再起動されるたびに実行しなくてはならない
+
+●共有プールに固定したストアドを解放する
+共有プールに固定したストアドを解放する
+ 
+SYSユーザで以下のコマンドを実行
+ 
+SQL> execute DBMS_SHARED_POOL.UNKEEP('scott.open_emp','P')
+
+PL/SQLプロシージャが正常に完了しました。
+ 
+# 解放されたかどうかを確認する
+
+SQL> SELECT owner,name,type,sharable_mem,loads,kept
+  2  FROM v$db_object_cache
+  3  WHERE owner = 'SCOTT' and TYPE = 'PROCEDURE';
+
+OWNER        NAME
+------------ --------------
+TYPE         SHARABLE_MEM LOADS      KEP
+------------ ------------ ---------- ---
+SCOTT        OPEN_EMP
+PROCEDURE    13694        1          NO
+ 
+# kept列がNOの場合、共有メモリに固定されていない
+
+●DBMS_PROFILERパッケージを使ったボトルネックの検出
+先に事前準備をしておくこと
+ 
+# まず、DBMS_PROFILER.START_PROFILERを実行する。引数には任意のコメントを設定
+execute DBMS_PROFILER.START_PROFILER('open_emp')
+
+# ストアドを実行
+execute scott.open_emp(20, 'KING')
+
+# DBMS_PROFILER.STOP_PROFILERを実行する
+execute DBMS_PROFILER.STOP_PROFILER
+
+# RUN IDを確認するSQL
+select
+    runid,
+    to_char(run_date, 'YYYY-MM-DD HH24:MI:SS') day,
+    run_comment
+from plsql_profiler_runs
+order by runid;
+
+
+(実行結果)
+     RUNID DAY                 RUN_COMMENT
+---------- ------------------- ------------
+         1 2009-07-19 18:37:50 Check open_emp
+
+         2 2009-07-19 19:20:21 open_emp
+
+         3 2009-07-19 19:24:24 open_emp test
+
+
+
+# 調査するためのSQL
+# scottユーザにplsql_profiler_units、plsql_profiler_dataのselect権限を与えて
+# scottユーザで以下のSQL文を実行
+# set linesize 120にしておく
+select
+   p.unit_name,
+   p.occured,
+   p.tot_time,
+   p.line# line,
+   substr(trim(s.text), 1, 20) text
+from
+   (select
+       u.unit_name,
+       d.total_occur occured,
+       (d.TOTAL_TIME/100000000) tot_time,
+       d.line#
+    from sys.plsql_profiler_units u,
+         sys.plsql_profiler_data d
+    where d.RUNID=u.runid
+    and d.UNIT_NUMBER = u.unit_number
+    and d.total_occur > 0
+    and u.runid = &runid
+    ) p,
+    user_source s
+    where  p.unit_name = s.name(+) and p.line# = s.line(+)
+    order by p.unit_name , p.line#
+    ;
+
+runidに値を入力してください: 3
+旧  18:     and u.runid = &runid
+新  18:     and u.runid = 3
+
+UNIT_NAME                           OCCURED   TOT_TIME       LINE TEXT
+-------------------------------- ---------- ---------- ---------- ----------------------------------------
+<anonymous>                               2  .02628686          1
+<anonymous>                               2  .02268724          1
+<anonymous>                               1  .00075009          1
+DBMS_OUTPUT                               8   .0023299        111
+DBMS_PROFILER                             1  .05125372         67
+DBMS_PROFILER                             1  .00048609         80
+DBMS_PROFILER                             1  .00024723         81
+DBMS_PROFILER                             1  .00059085        121
+DBMS_PROFILER                             1  .00021371        126
+DBMS_PROFILER                             1    .000616        133
+DBMS_PROFILER                             1  .00191085        152
+
+UNIT_NAME                           OCCURED   TOT_TIME       LINE TEXT
+-------------------------------- ---------- ---------- ---------- ----------------------------------------
+DBMS_PROFILER                             1  .00026819        157
+OPEN_EMP                                  1  .01131428          1 PROCEDURE open_emp(n
+OPEN_EMP                                  1  .23003202          8 OPEN cur_cv FOR 'SEL
+OPEN_EMP                                  9          0         10 LOOP
+OPEN_EMP                                  9  .57743931         11 fetch cur_cv INTO em
+OPEN_EMP                                  9  .00574095         12 EXIT WHEN cur_cv%NOT
+OPEN_EMP                                  8  .03249295         13 DBMS_OUTPUT.PUT_LINE
+OPEN_EMP                                  1  .03519162         15 CLOSE cur_cv;
+OPEN_EMP                                  1  .00260647         17 END;
+
+20行が選択されました。
+
+(プロとしてのPL入門、P257も参照)
+
+●ストアドへのパラメータの指定
+定義の順番通りに指定する位置表記法と、名前を指定する名前表記法がある。
+
+例:)
+（定義）
+CREATE OR REPLACE PROCEDURE proc1(
+    p_no IN NUMBER, p_name OUT VARCHAR2)
+AS
+BEGIN
+.....
+END proc1
+
+（SQLPlusでの呼び出し）
+SQL> EXECUTE proc1(p_name=>:g_name, p_no=>100)  --名前表記法なので順番通りでなくてよい
+
+※矛盾がなければ、位置表記法と名前表記法の混在も大丈夫。
+　最初が位置表記法で、次が名前表記法など。
+
+●例外発生後も処理を継続する（例外のネスト）
+--例外発生後も処理を継続させる
+--FOR文の中に例外ブロックを書いてしまう
+DECLARE
+  err EXCEPTION;
+  CURSOR dept_cur IS SELECT deptno FROM dept;
+BEGIN
+  FOR r IN dept_cur LOOP
+    BEGIN
+      IF r.deptno = 30 THEN
+        RAISE err;
+      ELSE
+        DBMS_OUTPUT.PUT_LINE(r.deptno);
+      END IF;
+    EXCEPTION
+      WHEN err THEN
+        DBMS_OUTPUT.PUT_LINE('例外発生');
+    END;
+  END LOOP;
+END;
+/
+
+※実行結果
+10
+20
+例外発生
+40
+50
+PL/SQLプロシージャが正常に完了しました。
+SQL>
+
+●PL/SQLで使えるデータ型（スカラ型以外）
+
+・コンポジット型
+TABLE型
+TABLE型で宣言したオブジェクトをコレクションと呼び、索引を使用して配列のようにデータアクセスできる。
+
+RECORD型
+RECORD型で宣言したオブジェクトをレコードと呼び、一意の名前を持つフィールドを複数定義できる。また、各フィールドに任意のデータ型を指定できる。
+
+VARRAY型
+VARRAY型で宣言したオブジェクトはVARRAYと呼び、可変サイズの配列を指定できる。（但し、増える一方）
+
+・参照型
+REF CURSOR型
+REF CURSOR型で宣言した変数をカーソル変数と呼び、カーソルのメモリ位置（アドレス）を保持する。
+
+・LOB型
+CLOB型
+巨大な文字データを格納。最大値は4GB。
+
+BLOB型
+巨大なバイナリデータを格納。最大値は4GB。
+
+●PL/SQLで使えるデータ型（スカラー型）
+スカラー型
+・数値型
+NUMBER(SIZE, (dec))
+1E-130から1.0E-126（ただし1.0E126は含まない）までの絶対値を持つ固定小数点数及び浮動小数点数を格納する。指定できる最大の精度は、10進数の38桁まで。
+
+BINARY_INTEGER
+符号付きの整数を格納するために使用する。
+ノート「サブタイプいろいろ」参照。
+
+PLS_INTEGER
+符号付き整数を格納するために使用する。
+9iでは最も早く動作する。10gではBINARY_INTEGERと変わらず。
+11gでは不明。
+
+・文字型
+CHAR(SIZE)
+固定長の文字データを格納。最大32767バイト。指定しない場合は1バイトとなる。
+
+VARCHAR2(SIZE)
+可変長の文字データ格納。最大32767バイト。指定しないとエラーとなる。
+
+NCHAR(SIZE)
+固定長の各国語の文字列格納。最大32767バイト。
+
+NVARCHAR2
+可変長の各国語の文字列格納。最大32767バイト。
+
+ROWID
+ROWID疑似列の文字列を格納
+
+・日付型
+DATE
+年月日時分秒のデータを格納。有効日付は紀元前4712年1月1日から9999年12月31日まで
+
+●一時LOBについて
+一時LOBは、LOBに対する変換操作を実行するような場合に、ローカル変数と似たインタフェースを提供するものです。画像タイプをGIFからJPEGに変換するような場合に便利です。
+
+一時LOBは、DBMS_LOB.CREATETEMPORARYプロシージャを使用して作成します。LOBデータ型としては、BLOB、CLOB、NCLOBを使用することができます。 
+一時LOBを作成したセッションだけが一時LOBを使用することができます。一時LOBは、セッションのメモリ(UGA)を使用して処理され、メモリが不足している場合は、作成したユーザーの一時表領域に格納されます。
+
+セッションが終了すると自動的に一時LOBは削除され、REDOやUNDOを生成することもありませんので、永続的なLOBを使用するよりも高速に処理を行うことができます。
+
+●PL/SQLのトレース
+PL/SQLプログラムのトレースを行う場合、PLSQL_DEBUG初期化パラメータをTRUEに設定してからコンパイルを行うか、DEBUGコンパイラオプションを使用して再コンパイルを行います。
+ALTER SESSION SET PLSQL_DEBUG=TRUE;
+CREATE OR REPLACE PROCEDURE proc1 ...;
+
+ALTER PROCEDURE proc1 COMPILE DEBUG;
+
+USER_PLSQL_OBJECT_SETTINGSビューにて設定を確認することができます。
+
+SELECT name,plsql_debug FROM user_plsql_object_settings WHERE name LIKE 'PROC%';
+
+NAME            PLSQL_DEBUG
+--------------- --------------------
+PROC1           TRUE
+PROC2           FALSE
+PROC3           FALSE
+
+●DBMS_METADATAパッケージについて
+DBMS_METADATAパッケージは、ディクショナリ内のメタデータを抽出、操作、再送信を提供します。メタデータはXMLまたはDDLとして抽出し、XMLを送信することで、オブジェクトの再作成ができます。
+DBMS_METADATAパッケージのプログラミングに使用するサブプログラムには次のものがあります。
+・OPEN:オブジェクトのタイプとバージョン、モデルを指定することでオブジェクトのハンドルを戻す
+・SET_FILTER:取り出すオブジェクトに対する制限(名前やスキーマなど)を指定
+・SET_COUNT:FETCH_xxxによる1回のコールで取り出すオブジェクトの最大数を指定
+・GET_QUERY:FETCH_xxxで使用される問合せテキスト(SYS.KU$_HTABLE_VIEWへの問合せなど)を戻す
+・SET_PARSE_ITEM:出力を解析できるように戻されるオブジェクト属性を指定
+・ADD_TRANSFORM:FETCH_xxxを通じて適用される変換を指定することで、変換用のハンドルを戻す
+・SET_TRANSFORM_PARAM:変換ハンドルで指定されるXSLTスタイルシートに変換内容を指定する
+・SET_REMAP_PARAM:変換ハンドルで指定されるXSLTスタイルシートに変換内容を指定する
+・FETCH_xxx:条件を満たすオブジェクトを取得する
+・CLOSE:OPENで作成されたオブジェクトハンドルを無効化し、クリーンアップを行う
+SET_REMAP_PARAMを使用すると、表領域やスキーマを変更することができます。
+FETCH_DDLは、結果データがネストした表で戻されます。戻されるデータ型は、SYS.KU$_DDLSというネストした表型です。
+SQL> CREATE TABLE meta_tab(name VARCHAR2(30),md CLOB);
+表が作成されました。
+SQL> CREATE OR REPLACE PROCEDURE proc1
+  2 AS
+  3 h1 NUMBER;
+  4 th1 NUMBER;
+  5 doc SYS.KU$_DDLS;
+  6 ddl CLOB;
+  7 pi SYS.KU$_PARSED_ITEMS;
+  8 objname VARCHAR2(30);
+  9 BEGIN
+ 10      h1 := DBMS_METADATA.OPEN('TABLE');
+ 11      DBMS_METADATA.SET_PARSE_ITEM(h1,'NAME');
+ 12      th1 := DBMS_METADATA.ADD_TRANSFORM(h1,'DDL');
+ 13      DBMS_METADATA.SET_TRANSFORM_PARAM(th1,'SEGMENT_ATTRIBUTES',false);
+ 14      LOOP
+ 15           doc := DBMS_METADATA.FETCH_DDL(H1);
+ 16           EXIT WHEN doc IS NULL; 
+ 17           FOR i IN doc.FIRST..doc.LAST LOOP
+ 18                ddl := doc(i).ddlText;
+ 19                pi := doc(i).parsedItems;
+ 20                IF pi IS NOT NULL AND pi.COUNT > 0 THEN
+ 21                     FOR j IN pi.FIRST..pi.LAST LOOP
+ 22                          IF pi(j).item='NAME' THEN
+ 23                               objname := pi(j).value;
+ 24                          END IF;
+ 25                     END LOOP;
+ 26                END IF;
+ 27                INSERT INTO meta_tab VALUES (objname,ddl);
+ 28                COMMIT;
+ 29           END LOOP;
+ 30      END LOOP;
+ 31      DBMS_METADATA.CLOSE(h1);
+ 32 END;
+ 33 /
+プロシージャが作成されました。
+SQL> exec proc1
+SQL> SELECT * FROM meta_tab;
+NAME
+---------------------------------------------
+MD
+---------------------------------------------------------------
+META_TAB
+CREATE TABLE "SCOTT"."META_TAB"
+   ( "NAME" VARCHAR2(30),
+        "MD" CLOB
+   )
+ORDERS
+CREATE TABLE "SCOTT"."ORDERS"
+   ( "ORDERID" NUMBER(5,0),
+        "ORDERED" DATE,
+        "ITEMS" "SCOTT"."ITEM_TYP_NST"
+   )
+…
+上記のコードでは、FETCH_DDLを使用して取得したメタデータを独自の表に格納しています。
+(iStudyの解説より)
+
+
+●DBMS_METADATAパッケージのSET_FILTERプロシージャ
+DBMS_METADATAパッケージのSET_FILTERプロシージャは、取り出すオブジェクトに関する制限事項を指定するために使用します。
+
+PROCEDURE SET_FILTER
+ 引数名              タイプ     In/Out Default?
+ ------------------- ---------- ------ --------
+ HANDLE              NUMBER     IN
+ NAME                VARCHAR2   IN
+ VALUE V             ARCHAR2    IN
+ OBJECT_TYPE_PATH    VARCHAR2   IN     DEFAULT
+
+SET_FILTERプロシージャを使用するには、OPENファンクションで戻したオブジェクトハンドルとフィルタの名前と値が必要です。値であるVALUEパラメータは、NUMBER、BOOLEAN型にしたプロシージャもオーバーロードされています。
+SET_FILTERは複数回コールすることで、FETCHする条件を追加することができます。
+CREATE OR REPLACE FUNCTION get_table(p_name VARCHAR2)
+RETURN CLOB
+AS
+  v_hd NUMBER;
+  v_th NUMBER;
+  v_doc CLOB;
+BEGIN
+  v_hd := DBMS_METADATA.OPEN('TABLE');
+  DBMS_METADATA.SET_FILTER(v_hd,'SCHEMA','OE');
+  DBMS_METADATA.SET_FILTER(v_hd,'NAME',UPPER(p_name));
+  v_th := DBMS_METADATA.ADD_TRANSFORM(v_hd,'DDL');
+  v_doc := DBMS_METADATA.FETCH_CLOB(v_hd);
+  DBMS_METADATA.CLOSE(v_hd);
+  RETURN v_doc;
+END;
+上記のコードの場合、OPENファンクションでは、TABLEタイプのオブジェクトを使用するハンドルを戻します。SET_FILTERを使用して、OEスキーマに限定することとp_nameパラメータで受け取った表名に限定しています。ADD_TRANSFORMにてDDLで出力するように変換した後、FETCH_CLOBにて情報を取得します。
+
+SELECT get_table('orders') FROM dual;
+GET_TABLE('ORDERS')
+-------------------------------------------------------------------
+  CREATE TABLE "OE"."ORDERS"
+   ( "ORDER_ID" NUMBER(12,0),
+        "ORDER_DATE" TIMESTAMP (6) WITH LOCAL TIME ZONE CONSTRAINT "ORDER_DATE_NN" NOT NULL ENABLE,
+        "ORDER_MODE" VARCHAR2(8),
+…
+
+●PL/scopeについて
+(11g以降より使用可能)
+PL/Scopeは、PL/SQLコード内のオブジェクトに識別子を割り当て、情報を収集することのできるツールです。
+識別子にシグネチャを割り当て、使用している箇所や使用しているデータを明確に識別できます。
+
+CREATE OR REPLACE PROCEDURE proc1
+AS
+  v1 NUMBER;
+  CURSOR c1 IS SELECT * FROM emp;
+BEGIN
+  v1 := 1;
+  v1 := v1+1;
+END;
+/
+ALTER PROCEDURE proc1 COMPILE PLSCOPE_SETTINGS='IDENTIFIERS:ALL';
+SELECT name,type,usage,line,signature FROM user_identifiers
+WHERE object_name='PROC1' ORDER BY usage_id;
+NAME  TYPE       USAGE       LINE SIGNATURE
+----- ---------- ----------- ---- --------------------------------
+PROC1 PROCEDURE  DECLARATION    1 81C005FDC6D795616891CE2E9CF71F14
+PROC1 PROCEDURE  DEFINITION     1 81C005FDC6D795616891CE2E9CF71F14
+V1    VARIABLE   DECLARATION    3 553CAF52CC2A12C44E8706C0C4C9C777
+C1    CURSOR     DECLARATION    4 1CAC36E8700B8141B417975A40CFD910
+V1    VARIABLE   ASSIGNMENT     6 553CAF52CC2A12C44E8706C0C4C9C777
+V1    VARIABLE   ASSIGNMENT     7 553CAF52CC2A12C44E8706C0C4C9C777
+V1    VARIABLE   REFERENCE      7 553CAF52CC2A12C44E8706C0C4C9C777
+識別子情報として、次のような結果を確認できます。
+・TYPE:識別子のタイプ(PACKAGE、PROCEDURE、FUNCTION、FORMAL:パラメータリスト、VARIABLE:変数など)
+・USAGE:使用方法
+─DECLARATION:宣言
+─DEFINITION:定義
+─CALL:コール
+─REFERENCE:参照
+─ASSIGNMENT:代入
+・LINE:使用場所(使用している行番号)
+シグネチャ(SIGNATURE)が同じ場合は、同じデータであることを意味しています。上記のコードであれば、V1変数が宣言(DECLARATION)された後、値の代入(ASSIGNMENT)や値の参照(REFERENCE)が行われています。
+
+●DBMS_DESCRIBEパッケージ
+(10g以降で使えるらしい)
+DBMS_DESCRIBEパッケージは、DESCRIBE_PROCEDUREプロシージャ1つのみを含むパッケージです。DBMS_DESCRIBE.DESCRIBE_PROCEDUREを使用することで、PL/SQLオブジェクトに関する情報の取得を行うことができます。
+DBMS_DESCRIBE.DESCRIBE_PROCEDUREは、3つのINパラメータを受け取ります。1つ目のOBJECT_NAMEにてPL/SQLオブジェクト名を受け取り、残りの2つのパラメータは将来用に予約されています。
+　
+OUTパラメータは結合配列になっており、詳細な情報が戻されます。　
+　
+・OVERLOAD:オーバーロードされている場合の異なるバージョン番号　
+・POSITION:パラメータリスト内の位置。0はファンクションのRETURNをあらわす　
+・LEVEL:コンポジット型のデータ型のレベル　
+・ARGUMENT_NAME:パラメータ名　
+・DATATYPE:パラメータのデータ型(以下のような数値)　
+-1:VARCHAR2　
+-2:NUMBER　
+-3:PLS_INTEGER、BINARY_INTEGER　
+-8:LONG　
+-12:DATE　
+-23:RAW　
+-24:LONG RAW　
+-96:CHAR　
+-122:ネストした表　
+-123:VARRAY　
+-250:レコード型　
+-251:結合配列　
+-252:BOOLEAN　
+・DEFAULT_VALUE:デフォルト値なし=0、あり=1　
+・IN_OUT:IN=0、OUT=1、IN OUT=2　
+・LENGTH:%ROWTYPEなら最大サイズ、その他は0　
+・PRECISION:パラメータがNUMBER型のとき、数値の精度　
+・SCALE:パラメータがNUMBER型のとき、数値の位取り　
+・RADIX:パラメータがNUMBER型のとき、数値の奇数　
+・SPARE:将来用
+<pre><font face="ＭＳ ゴシック">CREATE OR REPLACE PROCEDURE get_data(p_name VARCHAR2)
+AS
+  v_overload DBMS_DESCRIBE.NUMBER_TABLE;
+  v_position DBMS_DESCRIBE.NUMBER_TABLE;
+  v_level DBMS_DESCRIBE.NUMBER_TABLE;
+  v_argument_name DBMS_DESCRIBE.VARCHAR2_TABLE;
+  v_datatype DBMS_DESCRIBE.NUMBER_TABLE;
+  v_default_value DBMS_DESCRIBE.NUMBER_TABLE;
+  v_in_out DBMS_DESCRIBE.NUMBER_TABLE;
+  v_length DBMS_DESCRIBE.NUMBER_TABLE;
+  v_precision DBMS_DESCRIBE.NUMBER_TABLE;
+  v_scale DBMS_DESCRIBE.NUMBER_TABLE;
+  v_radix DBMS_DESCRIBE.NUMBER_TABLE;
+  v_spare DBMS_DESCRIBE.NUMBER_TABLE;
+BEGIN
+  DBMS_DESCRIBE.DESCRIBE_PROCEDURE(
+    p_name,null,null,v_overload,v_position,v_level,v_argument_name,v_datatype,v_default_value,
+    v_in_out,v_length,v_precision,v_scale,v_radix,v_spare,TRUE);
+  IF v_in_out.FIRST IS NULL THEN
+    DBMS_OUTPUT.PUT_LINE('No Argments');
+  ELSE
+    DBMS_OUTPUT.PUT_LINE(
+      RPAD('Name',30,' ')||RPAD('Mode',5,' ')||RPAD('Pos',4,' ')||'Datatype');
+    DBMS_OUTPUT.PUT_LINE(
+      RPAD('-',29,'-')||RPAD(' ',5,'-')||RPAD(' ',4,'-')||RPAD(' ',8,'-'));
+    FOR i IN v_argument_name.FIRST..v_argument_name.LAST LOOP
+      IF v_position(i)=0 THEN
+        DBMS_OUTPUT.PUT_LINE(RPAD('Function..',39,' ')||
+        v_datatype(i));
+      ELSE
+        DBMS_OUTPUT.PUT_LINE(
+          RPAD(v_argument_name(i),30,' ')||
+          RPAD(v_in_out(i),5,' ')||
+          RPAD(v_position(i),4,' ')||v_datatype(i));
+      END IF;
+    END LOOP;
+  END IF;
+END;
+/
+exec get_data('pack1.proc1')
+SQL> exec get_data('proc1')
+Name Mode Pos Datatype
+----------------------------- ---- --- -------
+P_TABLE 0 1 1
+P_STATUS 0 2 2
+P_CNT 1 3 2
+上記の結果であれば、PACK1パッケージのPROC1プロシージャは3つの引数をとり、最初の2つはINパラメータ(Mode=0)最後はOUTパラメータ(Mode=1)です。データ型は、最初はVARCHAR2型、2番目と3番目はNUMBER型です。　
+
+●サブプログラムのインライン化
+(11g以降の機能らしい)
+
+サブプログラムのインライン化によって、（同じPL/SQLユニット内のサブプログラムに対する）サブプログラム・コールは、コール先サブプログラムのコピーに置き換えられます。ほとんどの場合はこれによって、プログラムのパフォーマンスが向上します。
+
+PRAGMA INLINEを使用して、個々のサブプログラム・コールがインライン化されるかどうかを指定できます。コンパイル・パラメータPLSQL_OPTIMIZE_LEVELを3（デフォルトは2）に設定することによって、自動インライン化を有効にする（コンパイラにインライン化の機会を探るように要求する）こともできます。
+
+まれに、自動インライン化を行ってもプログラムのパフォーマンスが向上しないことがありますが、この場合は、PL/SQL階層型プロファイラを使用して、インライン化を無効にするサブプログラムを識別できます。
+
+詳細は、次の項を参照してください。
+*PL/SQLでプログラムを最適化する方法
+*INLINEプラグマ
+
+●FORALL文でエラーの行はスキップして残りを処理する
+CREATE TABLE test2(c1 NUMBER);
+--0以下は格納できないチェック制約をつける
+ALTER TABLE test2 ADD CONSTRAINT test2_ck CHECK(c1>0);
+
+DECLARE
+  TYPE num_typ IS TABLE OF NUMBER;
+  nums num_typ := num_typ(1,0,2,3,0,4,0,5);
+BEGIN
+  FORALL i IN nums.FIRST .. nums.LAST
+  SAVE EXCEPTIONS     --エラーの行は無視してそれ以降を処理する
+  INSERT INTO test2 SELECT * FROM test1 WHERE c1=nums(i);
+EXCEPTION
+  WHEN OTHERS THEN NULL;
+END;
+/
+
+※実行結果
+SQL> SELECT * FROM test2;
+        C1
+----------
+         1
+         2
+         3
+         4
+         5
+
+●PL/SQLよりSQLが早い場合
+-- SQL(こっちのほうが早い）
+BEGIN
+  INSERT INTO inventories2 SELECT * FROM inventories;
+END;
+-- PL/SQL
+BEGIN
+  FOR rec IN (SELECT * FROM inventories) LOOP
+    INSERT INTO inventories2 VALUES rec;
+  END LOOP;
+END;
+
+●BULK COLLECT INTOの例
+11gでは動く。10gでは不明。（TYPE emp_typ...がそのままでよいのか、構造体を切らねばいけないのかが試してみないとわからない）
+
+DECLARE
+  CURSOR emp_cur IS SELECT * FROM employees;
+  TYPE emp_typ IS TABLE OF employees%ROWTYPE;
+  emps emp_typ;
+BEGIN
+  OPEN emp_cur;
+  FETCH emp_cur BULK COLLECT INTO emps;
+  DBMS_OUTPUT.PUT_LINE(emps.COUNT);
+END;
+/
+(LIMIT句を使い、100行のみ取得)
+DECLARE
+  CURSOR emp_cur IS SELECT * FROM employees;
+  TYPE emp_typ IS TABLE OF employees%ROWTYPE;
+  emps emp_typ;
+BEGIN
+  OPEN emp_cur;
+  FETCH emp_cur BULK COLLECT INTO emps LIMIT 100;
+  DBMS_OUTPUT.PUT_LINE(emps.COUNT);
+END;
+/
+
+●SIMPLE_INTEGERについて（アクセスの早い整数型）
+Ora11gより、SIMPLE_INTEGERというPLS_INTEGERより早い整数型が登場した。
+
+PLS_INTEGERのSIMPLE_INTEGERサブタイプ
+SIMPLE_INTEGERはPLS_INTEGERデータ型の事前定義のサブタイプです。PLS_INTEGERと同じ範囲（-2147483648から2147483647）を取り、NOT NULL制約を含んでいます。 
+PLS_INTEGERとの大きな違いはオーバーフローの方法です。
+SIMPLE_INTEGERは、値がNULLになることがなく、オーバーフロー・チェックが不要な場合に使用できます。 
+SIMPLE_INTEGER値に対する算術演算はハードウェアで直接実行されるため、SIMPLE_INTEGERを使用すると、NULLかどうかのチェックおよびオーバーフロー・チェックのためのオーバーヘッドが発生せず、PLSQL_CODE_TYPE='NATIVE'の場合、PLS_INTEGERを使用するよりパフォーマンスが大幅に向上します。 
+PLSQL_CODE_TYPE='INTERPRETED'の場合、パフォーマンスの向上は少なくなります。
+
+●変数のNOT NULL制約
+変数のNOT NULL制約
+
+変数が代入されるたびに、その値がNULLかどうかをチェックし、
+NULLである場合は例外を発生させる。
+例外が発生した場合でも、元の値は保持される。
+代入のたびにNULLチェックが走るため、パフォーマンスは良くない。
+
+●ネイティブコンパイルするには
+ネイティブコンパイルするには、以下のことが必要
+・PLSQL_OPTIMIZER_LEVELをシステムレベルで2に設定する
+・PLSQL_CODE_TYPEをシステムレベルでNATIVEに設定する
+・$ORACLE_HOME/rdbms/admin/dbmsupgnv.sqlを実行
+
+●BLOBを読みだしてファイルに出力
+例１）　表「blob01」の列「filedata」に格納されているBLOBデータをファイル「c:\temp\'sample02.gif'」に出力する。
+
+（１）事前準備。バイナリファイルの格納ディレクトリ「c:\temp」のディレクトリオブジェクト「LOB_DIR」を作成する
+-- ディレクトリオブジェクトの作成
+create directory LOB_DIR as 'c:\temp';
+--　ディレクトリオブジェクトに読み込み権限をユーザ「test」に付与する。
+grant read on directory LOB_DIR to test;
+　
+（２）表「blob01」にファイル「c:\temp\'sample02.gif'」を格納する。
+declare
+
+　　v_blob_data blob;
+　　v_blob_buffer long raw;
+　　v_file_size integer;
+　　v_file_handle utl_file.file_type;
+　　v_start_point integer := 1;
+　　v_write_size integer := 2000;
+
+begin
+
+　　 -- BLOBデータ列「filedata」のロケータを「v_blob_data」に代入する
+　　select filedata into v_blob_data from blob01 where code = '001';
+
+　　 -- 出力ファイル「sample02.gif」を"wb"モードでオープンする
+　　v_file_handle := utl_file.fopen('LOB_DIR', 'sample02.gif', 'wb');
+
+　　 -- BLOBデータのサイズを取得する
+　　v_file_size := dbms_lob.getlength(v_blob_data);
+
+　　 while v_start_point < v_file_size loop
+
+　　　　 -- 最後の書込みの場合、書込みサイズを残りサイズに合わせる
+　　　　if v_start_point + v_write_size > v_file_size then
+　　　　　　v_write_size := v_file_size - v_start_point +1;
+　　　　end if;
+
+　　　　 -- BLOBデータを先頭からBLOBデータサイズ読み込み、「v_blob_buffer」に代入
+　　　　dbms_lob.read(v_blob_data, v_write_size, v_start_point, v_blob_buffer);
+
+　　　　 -- 「v_blob_buffer」に代入されたBLOBデータをファイル出力する
+　　　　utl_file.put_raw(v_file_handle, v_blob_buffer, true);
+
+　　　　 -- 書込み開始位置を進める
+　　　　v_start_point := v_start_point + v_write_size;
+
+　　end loop;
+
+-- 出力ファイル「sample02.gif」をクローズする。
+utl_file.fclose(v_file_handle);
+
+end;
+
+●BLOBの登録
+例１）　
+ファイル「c:\temp\big_star.bmp」を表「blob_sample」に格納する。
+
+（１）表「blob_sample」のDDL
+create table blob_sample (
+　blob_id　char(3)　primary key,
+　blob_data　blob
+);
+
+
+（２）事前準備。バイナリファイルの格納ディレクトリ「c:\temp」のディレクトリオブジェクト「LOB_DIR」を作成する
+-- ディレクトリオブジェクトの作成
+create directory LOB_DIR as 'c:\temp';
+--　ディレクトリオブジェクトに読み込み権限をユーザ「test」に付与する。
+grant read on directory LOB_DIR to test;
+　
+（３）表「blob_sample」にファイル「c:\temp\big_star.bmp」を格納する。
+
+declare
+
+　-- ファイル「c:\temp\big_star.bmp」をbfile型で生成
+　bmp_file bfile := bfilename( 'LOB_DIR', 'big_star.bmp');
+
+　-- 表「blob_sample」の項目「blob_data」のポインタを格納する変数を定義
+　v_blob_data blob;
+
+begin
+
+　-- 表「blob_sample」に新規レコードを生成。項目「blob_data」には、空データを設定する。
+　-- また、項目「blob_data」のポインタを「v_blob_data」に代入する。
+　insert into blob_sample values( 'B01', empty_blob())
+　　　returning blob_data into v_blob_data;
+
+　-- ファイル「c:\temp\big_star.bmp」を読み込みモードでオープン
+　dbms_lob.fileopen( bmp_file, dbms_lob.file_readonly);
+
+　--　ファイルのデータを、項目「blob_data」に更新する。
+　dbms_lob.loadfromfile( v_blob_data, bmp_file, dbms_lob.getlength( bmp_file ));
+
+　-- ファイル「c:\temp\big_star.bmp」をクローズ
+　dbms_lob.fileclose( bmp_file );
+
+　commit;
+
+end;
+
+●CLOBの取得と書き込み
+DECLARE
+  v_loc CLOB;
+  v_text VARCHAR2(50) := 'Happy';
+  v_amount NUMBER;
+  v_offset NUMBER;
+BEGIN
+  --行ロックして取得しないと、書き込みでエラーになる
+  SELECT resume INTO v_loc FROM cust WHERE id=1 FOR UPDATE;
+  v_offset := DBMS_LOB.GETLENGTH(v_loc)+2;
+  v_amount := LENGTH(v_text);
+  --CLOBに書き込み
+  DBMS_LOB.WRITE(v_loc,v_amount,v_offset,v_text);
+END;
+/
+
+●BFILE型を扱ったサンプル？
+--ディレクトリオブジェクト作成
+CREATE DIRECTORY cust_files AS '/FILES/MEDIA_FILES';
+--権限付与
+GRANT READ ON DIRECTORY cust_files TO PUBLIC;
+CREATE OR REPLACE PROCEDURE set_file(
+  p_dir VARCHAR2,p_id NUMBER)
+AS
+  v_name VARCHAR2(50);
+  v_file BFILE;
+  CURSOR cust_cur IS SELECT cust_first_name FROM customers
+    WHERE customer_id=p_id;
+BEGIN
+  SELECT cust_first_name||'.gif' INTO v_name FROM customers
+  WHERE customer_id=p_id;
+
+  --ディレクトリオブジェクト名とファイル名からBFILEを取得
+  v_file := BFILENAME(p_dir,v_name);
+  IF DBMS_LOB.FILEEXISTS(v_file) = 1 THEN
+    DBMS_LOB.FILEOPEN(v_file);
+    --ファイルサイズを取得
+    DBMS_OUTPUT.PUT_LINE(v_name||':'||DBMS_LOB.GETLENGTH(v_file));
+    DBMS_LOB.FILECLOSE(v_file);
+  END IF;
+END;
+/
+--ディレクトリオブジェクトは大文字で指定しなくてはならない
+execute set_file('CUST_FILES',844);
+
+※データベースに格納されていないBFILE、って意味がないような…
+
+●DBMS_LOBパッケージの関数
+DBMS_LOBパッケージには、LOB操作に必要なプロシージャ/ファンクションが含まれています。
+
+・APPEND:ソースLOB内容全体を宛先LOBに追加
+・COPY:ソースLOB全体または一部を宛先LOBにコピーする
+・LOADFROMFILE:BFILEを内部LOBにロードする
+・WRITE:LOB内の指定されたオフセット以降にデータを書き込む
+・WRITEAPPEND:LOBの最後にデータを書き込む
+・ERASE:LOB全体または一部を消去する
+・TRIM:LOB値を指定された長さに切り捨てる
+・READ:指定されたオフセット以降のデータを読み込む
+・GETLENGTH:LOBの長さを戻す
+・INSTR:指定したパターンが一致するLOB内の位置を戻す
+・SUBSTR:指定されたオフセット以降の指定されたサイズ分のデータを戻す
+
+●LOBコンポーネント
+・BLOB:ビデオや画像などのバイナリデータを扱う
+・CLOB:文字データを扱う
+・NCLOB:Unicodeを使用した文字データを扱う
+・BFILE:データベース外に格納されたバイナリファイルを扱う
+表に格納できるLOBは、内部LOBと呼ばれ、BLOB、CLOB、NCLOBが該当します。
+データベース外に格納されるBFILEは、外部LOBと呼ばれます。
+表に格納できるLOBは、BLOB、CLOB、NCLOBです。
+大規模なデータを扱うデータ型としてLONGとLONG RAWがありますが、
+LOBには、次のような特徴があります。
+
+・1つの表に複数のLOB列を宣言できる
+1つの表は、最大1000列まで扱うことができますが、全てをLOB列にすることも可能
+
+・最大サイズは、4GBまで扱うことができる
+10g以降であれば、TB単位のLOBを扱うことも可能です。ブロックサイズにも
+依存しますが、
+8TBから128TBのLOBを扱うこともできるようになりました。
+
+・LOB値を表内/表外に格納することが可能
+LOBデータのサイズが4000バイト未満であれば、表内に格納することも可能です。
+表の定義にて、常に表外(LOBセグメント)に格納することもできます。
+
+・SELECT文でロケータを戻す
+LOBデータが表外(LOBセグメント)に格納されている場合、列値として
+LOB値へのポインタであるロケータを格納します。
+その場合、SELECT文ではロケータを戻します。
+
+・データへのランダムアクセス
+LOBでは、ファイルシステムでファイルと同様に部分的なピース単位での
+アクセスをサポートします。
+LONGやLONG RAWの場合は、順次アクセスのみ可能です。
+
+●LOBコンポーネント
+・最大サイズは、4GBまで扱うことができる
+10g以降であれば、TB単位のLOBを扱うことも可能です。ブロックサイズにも
+依存しますが、
+8TBから128TBのLOBを扱うこともできるようになりました。
+
+・LOB値を表内/表外に格納することが可能
+LOBデータのサイズが4000バイト未満であれば、表内に格納することも可能です。
+表の定義にて、常に表外(LOBセグメント)に格納することもできます。
+
+・SELECT文でロケータを戻す
+LOBデータが表外(LOBセグメント)に格納されている場合、列値として
+LOB値へのポインタであるロケータを格納します。
+その場合、SELECT文ではロケータを戻します。
+
+・データへのランダムアクセス
+LOBでは、ファイルシステムでファイルと同様に部分的なピース単位での
+アクセスをサポートします。
+LONGやLONG RAWの場合は、順次アクセスのみ可能です。
+
+●ネストした表 (NESTED TABLE)
+
+ネステッド・テーブルは上限のない 一次元配列である。
+ネストした表の特徴
+
+* テーブル（データベース）に格納できる。
+* 添え字は 1 から開始する
+* 添え字は 1 ～ 2^31 まで
+* 配列の要素を順序付けをおこなわずに格納する。
+    1. データベースに格納すると添え字の情報は消失する。
+    2. データベースから取り出すと 1 オリジンで添え字が再割り当てされる。
+* PL/SQL ブロック内および外でも有効 (CREATE TYPE できる)
+* ネストした表を列として持つ親表は、表セグメント(TABLEセグメント)に格納されますが、ネストした表は、親表とは異なるネストした表セグメント(NESTED TABLEセグメント)に格納されます。
+* ネストした表の各行は、同じネストした表セグメントに格納されます。
+* ネストした表を直接権限管理することはありません。親表に対する権限がネストした表に透過的に反映します。ネストした表のデータに対する操作は明示的に行いますが、ネストした表セグメントや識別子を明示的に操作する必要はありません。
+* DELETEメソッドで値と要素を削除することができる。削除された要素は存在しなくなり、連番だった場合は歯抜け状態となるので、for文で使う場合は、EXISTメソッドで存在チェックをしたほうがよい。
+* 添え字を文字列型にした場合は、FOR文でループして取り出せない。（但し、その文字列が数値に暗黙的に変換できる場合は除く
+
+●VARRAY表型の列を持つテーブルの更新サンプル
+-- 3つのデータを格納するオブジェクト型
+CREATE TYPE proj_typ AS OBJECT(
+  pno NUMBER(4),title VARCHAR2(30),cost NUMBER(7,2))
+/
+-- VARRAY型の作成
+CREATE TYPE proj_list_typ AS VARRAY(10) OF proj_typ
+/
+-- VARRAY型の列を持つ表を作成
+CREATE TABLE dept(
+  deptno NUMBER(2),name VARCHAR2(20),proj proj_list_typ);
+deptno列を渡すとVARRAY型を戻すファンクションと、指定した位置に要素を追加する
+プロシージャで構成されたパッケージを作成します。
+-- パッケージ仕様部
+CREATE OR REPLACE PACKAGE dept_pkg
+AS
+  FUNCTION get_proj(p_deptno NUMBER) RETURN proj_list_typ;
+  PROCEDURE upd_proj(
+    p_deptno NUMBER,p_proj proj_typ,p_pos NUMBER);
+END;
+/
+-- パッケージ本体
+CREATE OR REPLACE PACKAGE BODY dept_pkg
+AS
+  -- deptnoで検索したVARRAYを戻すファンクション
+  FUNCTION get_proj(p_deptno NUMBER) RETURN proj_list_typ
+  IS
+    v_proj proj_list_typ;
+  BEGIN
+    SELECT proj INTO v_proj FROM dept WHERE deptno=p_deptno;
+    RETURN v_proj;
+  END;
+  -- 指定した位置に要素を追加するプロシージャ
+  PROCEDURE upd_proj(
+    p_deptno NUMBER,p_proj proj_typ,p_pos NUMBER)
+  IS
+    v_proj proj_list_typ;
+  BEGIN
+    -- VARRAYの取得
+    v_proj := get_proj(p_deptno);
+    -- VARRAYの拡張
+    v_proj.EXTEND;
+    -- 指定した位置をあけるために後の要素を移動
+    FOR i IN REVERSE p_pos .. v_proj.LAST-1 LOOP
+      v_proj(i+1) := v_proj(i);
+    END LOOP;
+    -- 指定した位置に要素を追加
+    v_proj(p_pos) := p_proj;
+    -- 列データの更新
+    UPDATE dept SET proj=v_proj WHERE deptno=p_deptno;
+  END;
+END;
+SELECT d1.deptno,d1.name,d2.* from dept d1,TABLE(d1.proj) d2;
+DEPTNO NAME PNO TITLE COST
+------ ---------- ----- --------- ------
+    10 ACCOUNTING 1001 DB10g 50000
+    20 RESEARCH 1002 DB11g 90000
+SQL> exec dept_pkg.upd_proj(20,proj_typ(1003,'DB11gR2',90000),3)
+BEGIN dept_pkg.upd_proj(20,proj_typ(1003,'DB11gR2',90000),3); END;
+*
+行1でエラーが発生しました。:
+ORA-06533: サブスクリプトがカウントを超えています。
+ORA-06512: "OE.DEPT_PKG", 行27
+ORA-06512: 行1<
+適切な要素の位置として、2番目を指定した場合
+SQL> exec dept_pkg.upd_proj(20,proj_typ(1003,'DB11gR2',90000),2)
+SQL> SELECT d1.deptno,d1.name,d2.* from dept d1,TABLE(d1.proj) d2;
+DEPTNO NAME       PNO        TITLE      COST
+------ ---------- ---------- ---------- ----------
+    10 ACCOUNTING 1001       DB10g      50000
+    20 RESEARCH   1002       DB11g      90000
+    20 RESEARCH   1003       DB11gR2    90000
+または、1番目を指定した場合
+SQL> exec dept_pkg.upd_proj(20,proj_typ(1003,'DB11gR2',90000),1)
+SQL> SELECT d1.deptno,d1.name,d2.* from dept d1,TABLE(d1.proj) d2;
+DEPTNO NAME       PNO        TITLE      COST
+------ ---------- ---------- ---------- ----------
+    10 ACCOUNTING 1001       DB10g      50000
+    20 RESEARCH   1003       DB11gR2    90000
+    20 RESEARCH   1002       DB11g      90000
+
+●VARRAYについて
+VARRAY (可変長配列 : Variable ARRAY ?)  
+
+上限のある可変長配列。旧来の配列の特徴に最も近い? 配列である。 10 個の大きさで宣言した VARRAY の添え字は 1 ～ 10 となる。
+
+可変長配列の特徴
+* データベースに格納できる。
+* 添え字は 1 オリジンで領域が連続している(密である)。添え字は常に連番である。
+* 配列のサイズは自動拡張されないが宣言の上限まで EXTEND メソッドで動的に拡張が可能。
+* EXTEND メソッドはデフォルトで NULL 初期化する。
+* コンストラクタを使用して初期化されていない場合には EXTEND は使用できない。
+* PL/SQL ブロック外でも有効 (CREATE TYPE できる)
+* DELETEメソッドで要素を削除できない。使用するとコンパイルエラーとなる
+
+●VARRAYのLIMITメソッド
+VARRAY型の最大要素数を返す。
+現時点で値が格納されている要素数ではない。
+ネストした表にLIMITメソッドを使用した場合は、NULLが戻るため、何も表示されません。
+
+例:)
+DECLARE
+  TYPE num_typ IS VARRAY(5) OF NUMBER(2);
+  num1 num_typ := num_typ(10,20);
+BEGIN
+  num1.EXTEND;
+  DBMS_OUTPUT.PUT_LINE(num1.LIMIT);
+END;
+｢5｣と表示される。
+
+●VARRAY型で格納された列を確認する
+--VARRAY型で格納された列の値を確認
+-- オブジェクト型の作成
+CREATE TYPE list AS OBJECT(id NUMBER(2),name VARCHAR2(10))
+/
+-- VARRAY型の作成
+CREATE TYPE list_typ AS VARRAY(2) OF list
+/
+-- VARRAY型の列を持つ表の作成
+CREATE TABLE dept(
+ deptno   NUMBER(2),
+ projects list_typ)
+/
+-- VARRAY型にNULL値を格納
+INSERT INTO dept VALUES(10,null);
+
+-- VARRAY型の列に1つの要素を格納
+UPDATE dept SET projects=list_typ(list(1,'DB10g')) WHERE deptno=10;
+格納された結果をSELECT文で取得するときに、TABLE式を使用することで、
+コレクションを表として取得することができます。
+-- TABLE式を使用しない場合
+SQL> SELECT * FROM dept;
+
+DEPTNO PROJECTS(ID, NAME)
+------ -------------------------------------
+    10 LIST_TYP(LIST(1, 'DB10g'))
+
+-- TABLE式を使用する場合
+SQL> SELECT d1.deptno,d2.* FROM dept d1,TABLE(d1.projects) d2;
+
+DEPTNO   ID NAME
+------ ---- ------------------------
+    10    1 DB10g
+
+●ネストした表型の変数を事前に初期化しないとエラーとなる
+SQL> DECLARE
+  2    v_items item_list;
+  3  BEGIN
+  4    v_items(1) := item_typ(13,4000);
+  5  END;
+  6  /
+DECLARE
+*
+行1でエラーが発生しました。:
+ORA-06531: 参照しているコレクションは初期化されていません。
+ORA-06512: 行4
+
+●ネストした表（NESTED TABLE）
+ネストした表とは、簡単に言うと動的配列のこと。
+インデックスは1から始まる。
+
+TYPE 配列名 IS TABLE OF データ型 [NOT NULL];
+
+変数名 配列名;
+変数名 := 配列名();　※コンストラクタで初期化
+ネスト表は、VARRAYと異なり、配列の最大サイズはありません。
+
+配列の配列の定義をしたら、変数として利用する為に続けて、配列名の変数を宣言します。
+定義した変数は、コンストラクタで初期化しないとアクセスできません。
+
+例１）　配列を定義、初期化した後、値を代入する。
+　declare
+　　-- 配列を定義。
+    type empno_array is table of varchar2(3);
+    -- 変数名”ep”で変数定義し、コンストラクタで初期化。
+    ep empno_array := empno_array('E01', 'E02', 'E03','E04','E05');
+　begin
+    -- 配列の１番目に、'E99'を代入
+    ep(1) := 'E99';
+　end;
+
+例２）　配列を定義、初期化する時には値を設定しない。
+　　　　配列を拡張する。
+　declare
+　　-- 配列を定義。
+    type empno_array is table of varchar2(3);
+    -- 変数名”ep”で変数定義し、コンストラクタで初期化。
+    ep empno_array := empno_array();
+　begin
+    -- 配列の１番目は初期化されてないのでエラーとなる。
+    ep(1) := 'E99';
+　　-- 配列の最後にNULL要素を１つ追加する。
+　　ep.extend;
+    -- 配列の１番目に、'E11'を代入する。
+    ep(1) := 'E11';
+　　-- 配列の最後にNULL要素を１００追加する。
+　　ep.extend(100);
+    -- 配列の２番目に、'E99'を代入する。
+    ep(2) := 'E99';
+　end;
+
+●ネストした表のデータを返す関数
+--ネスト表型のオブジェクトを作成しておく
+CREATE OR REPLACE TYPE nested_type IS TABLE OF VARCHAR2(10);
+/
+--ストアドファンクション作成
+CREATE OR REPLACE FUNCTION tab_fun
+RETURN nested_type
+IS
+    --初期化しておく
+    nest nested_type := nested_type();
+BEGIN
+    FOR i IN 1..3 LOOP
+        nest.extend;
+        nest(i) := 'Part' || i;
+    END LOOP;
+    RETURN nest;
+END;
+/
+
+（実行結果：SQL文で使える）
+SQL> select * from table(tab_fun);
+
+COLUMN_VAL
+----------
+Part1
+Part2
+Part3
+
+●オブジェクト型とネストした表型のサンプル
+-- オブジェクト型の作成
+CREATE TYPE item_typ AS OBJECT(
+  prod_id NUMBER(5),price NUMBER(7,2))
+/
+-- ネストした表型の作成(item_typにて2つのデータを格納できるコレクション)
+CREATE TYPE item_list AS TABLE OF item_typ
+/
+-- ネストした表を列として宣言(格納セグメント名はitem_tab)
+CREATE TABLE order_items(
+  order_id NUMBER(5),supplier NUMBER(5),ordered DATE,
+  items item_list)
+  NESTED TABLE items STORE AS item_tab;
+
+ネストした表にデータを格納するには、INSERT文にてコレクションメソッドを使用します。
+-- 2つの要素をINSERT文で追加
+INSERT INTO order_items VALUES(100,10,SYSDATE,
+  item_list(item_typ(11,5000),item_typ(12,3000)));
+
+-- ネストした表の要素をNULLとして追加(初期化なし)
+INSERT INTO order_items VALUES(101,15,SYSDATE,NULL);
+(実行結果)
+DECLARE
+  -- ネストした表型の変数宣言
+  v_items item_list;
+BEGIN
+  -- ネストした表型の列値を変数に代入
+  SELECT items INTO v_items FROM order_items WHERE order_id=100;
+  -- v_items.COUNTは、要素数を戻す。特定の要素番号に新しい要素の代入
+  v_items(v_items.COUNT) := item_typ(13,4000);
+  -- ネストした表を列値としてUPDATE
+  UPDATE order_items SET items=v_items WHERE order_id=101;
+END;
+/
+
+SQL> SELECT * FROM order_items;
+
+ORDER_ID SUPPLIER ORDERED  ITEMS(PROD_ID, PRICE)
+-------- -------- -------- -------------------------------------------------
+     100       10 09-10-12 ITEM_LIST(ITEM_TYP(11, 5000), ITEM_TYP(12, 3000))
+
+     101       15 09-10-12 ITEM_LIST(ITEM_TYP(11, 5000), ITEM_TYP(13, 4000))
+
+●結合配列 (索引付の表、俗に言うハッシュ)  
+マニュアルには結合配列と訳されているが、原文では Associative Array (＝連想配列) をあらわす。
+(Oracle よりも他の開発言語から連想配列やハッシュテーブルという言葉が急速に定着しているので、連想配列としてほしい。)
+
+結合配列の特徴
+* 配列の添え字(インデックス)の データ型と要素のデータ型を宣言して配列を定義する。
+* 結合配列の添え字は連続している(密である)必要はない。
+* 添え字は -2^31 ～ 2^31 まで
+文字型の場合には、制限なし? ( 未確認 )
+* データベースに格納できない。
+* 添え字に使用できるデータ型は整数および文字列(※)。
+* 配列のサイズは自動拡張される。
+* 初期化していなくても NULL ではない。
+実行開始時には既にアトミック NULL  ではなくアトミック NULL にできない。（エラーになる）
+* PL/SQL ブロック内だけで有効 (CREATE TYPE できない)
+(※) 添え字に使用できるデータ型は、整数の PLS_INTEGER、BINARY_INTEGER、
+文字列には VARCHAR2、VARCHAR2のサブタイプである STRING、LONG となっている。
+
+添え字のデータ型がVARCHAR2の場合、FOR文には使えない。（但し、添え字が数値に変換可能な文字列のみで構成されている場合を除く。）
+
+●サブタイプいろいろ
+$ORA_HOME/rdbms/admin/stdspec.sqlで作成されるSTANDARDパッケージに定義されている変数の型の別名。
+STANDARDパッケージはデフォルトで使用できる。
+以下のようなものが定義されている
+  subtype FLOAT is NUMBER; -- NUMBER(126)
+  subtype REAL is FLOAT; -- FLOAT(63)
+  subtype "DOUBLE PRECISION" is FLOAT;
+  subtype INTEGER is NUMBER(38,0);
+  subtype INT is INTEGER;
+  subtype SMALLINT is NUMBER(38,0);
+  subtype DECIMAL is NUMBER(38,0);
+  subtype NUMERIC is DECIMAL;
+  subtype DEC is DECIMAL;
+
+  --値が制限されている
+  subtype BINARY_INTEGER is INTEGER range '-2147483647'..2147483647;
+  --整数値のみ
+  subtype NATURAL is BINARY_INTEGER range 0..2147483647;
+  subtype NATURALN is NATURAL not null;
+  subtype POSITIVE is BINARY_INTEGER range 1..2147483647;
+  subtype POSITIVEN is POSITIVE not null;
+  -- 1,0,-1の3値のみ
+  subtype SIGNTYPE is BINARY_INTEGER range '-1'..1;  -- for SIGN functions
+
+●カーソル型変数のパラメータについて
+引数で渡されたカーソル変数をOpenする場合、その変数がIN OUTでなければエラーになる。
+もし、INで定義されていたらコンパイルエラーとなる。
+
+例：
+CREATE OR REPLACE PACKAGE emps
+AS
+  TYPE cur_typ IS REF CURSOR RETURN employees%ROWTYPE;
+  PROCEDURE proc1(p_id IN NUMBER,p_cur IN cur_typ);
+END;
+/
+
+CREATE OR REPLACE PACKAGE BODY emps
+AS
+  PROCEDURE proc1(p_id IN NUMBER,p_cur IN OUT cur_typ)
+  IS
+    v_emp employees%ROWTYPE;
+  BEGIN
+    OPEN p_cur FOR SELECT * FROM employees WHERE employee_id=p_id;
+    FETCH p_cur INTO v_emp;
+    DBMS_OUTPUT.PUT_LINE(v_emp.first_name);
+    CLOSE p_cur;
+  END;
+END;
+
+●強いREF CURSORについて
+RETURN句を使用して戻すレコード型を指定したREF CURSOR型のことを、
+強いREF CURSORと呼ぶ。
+
+例:)
+TYPE cur_type IS REF CURSOR RETURN employee%ROWTYPE;
+
+●カーソルについてのいろいろ
+カーソルからレコード型の変数を使ってフェッチする場合、列名が指定できない状態だと実行時エラーになる。
+
+例:) --二番目の列が計算式になっているので、指定できない
+CURSOR emp_cur IS select emp_id, salary * 12 from emp;
+emp_rec emp_cur;
+…
+(中略)
+…
+--FETCH時に実行時エラーに！
+FETCH emp_cur INTO emp_rec ; 
+
+●SYS_REFCURSOR
+Oracleに事前定義されたカーソル型。弱いカーソル。
+%ROWTYPEで変数を宣言することができない。
+Open時にSQL文を指定
+
+サンプル：
+CREATE OR REPLACE PROCEDURE proc1
+AS
+  refcur sys_refcursor;     
+  list employees.salary%TYPE;
+BEGIN
+  OPEN refcur FOR SELECT salary FROM employees;
+  LOOP
+    FETCH refcur INTO list;
+    EXIT WHEN refcur%NOTFOUND;
+  END LOOP;
+END;
+
+●パラメータへのポインタ渡し
+OUT引数、IN/OUT引数で使用できる
+サイズの大きいコレクションを渡すなどの時は効果がある。
+
+ストアドの引数定義で以下のように記述
+
+仮パラメータ名 OUT NOCOPY データ型
+仮パラメータ名 IN OUT NOCOPY データ型
+
+●RETURNING句のサンプル
+RETURNING句では、DML文で変更した結果を取得することができる
+
+CREATE OR REPLACE PACKAGE emp_app
+AS
+--レコード型の宣言
+TYPE emp_type IS RECORD (
+     empno emp.empno%TYPE,
+     ename emp.ename%TYPE,
+     sal emp.sal%TYPE);
+--レコード変数をOUTパラメータに持つプロシージャ
+PROCEDURE emp_upd(
+     p_empno IN emp.empno%TYPE,
+     p_raise IN PLS_INTEGER,
+     p_emp OUT emp_app.emp_type);
+END emp_app;
+/
+
+CREATE OR REPLACE PACKAGE BODY emp_app
+AS
+PROCEDURE emp_upd(
+     p_empno IN emp.empno%TYPE,
+     p_raise IN PLS_INTEGER,
+     p_emp OUT emp_app.emp_type)
+IS
+BEGIN
+     --UPDATE対象レコードをレコード変数に受け取る
+     UPDATE emp SET sal=sal * (1 + p_raise/100)
+     WHERE empno=p_empno 
+     --UPDATE後の値が格納される
+     RETURNING empno, ename, sal INTO p_emp;
+     END emp_upd;
+END emp_app ;
+/
+
+--実行確認
+SQL>
+SQL> set serveroutput on
+SQL> DECLARE
+ 2     v_emp emp_app.emp_type;
+ 3  BEGIN
+ 4     emp_app.emp_upd(7900, 10, v_emp);
+ 5     DBMS_OUTPUT.PUT_LINE('EMPNO : ' || v_emp.empno);
+ 6     DBMS_OUTPUT.PUT_LINE('ENAME : ' || v_emp.ename);
+ 7     DBMS_OUTPUT.PUT_LINE('SAL   : ' || v_emp.sal);
+ 8
+ 9  END;
+10  / 
+
+EMPNO : 7900
+ENAME : JAMES
+SAL   : 1045
+
+PL/SQLプロシージャが正常に完了しました。
+
+SQL>
+
+●ストアドに関するデータディクショナリビュー
+USER_OBJECTS               ... オブジェクト情報
+USER_PROCEDURES     ... プロシージャ情報
+USER_TRRIGERS             ... トリガー情報
+USER_SOURCE               ... ソースコードが格納
+USER_ERRORS               ... コンパイルエラーに関する情報格納
+
+USER_OBJECTSでOBJECT_TYPEがPROCEDURE、PACKAGE、PACKAGE BODY、TRIGGER、FUNCTIONのものがストアドプログラムに関するものである。
+
+USER_PROCEDURESでAUTHIDがCURRENT_USERのものが実行者権限、DEFINERのものが定義者権限である。     
+
+PL/SQL Silver 黒本 P332～P334
+
+●ストアドプログラムの実行権限
+EXECUTE ANY PROCEDUREシステム権限 ... 任意スキーマのストアドプログラムの実行が可能
+EXECUTEオブジェクト権限 ... 付与されたストアドプログラムの実行が可能
+
+例：オブジェクト権限の付与
+GRANT EXECUTE ON ストアドプログラム名
+     TO {ユーザ名 | ロール名 | PUBLIC };
+
+例：オブジェクト権限の取消
+REVOKE EXECUTE ON ストアドプログラム名
+     FROM {ユーザ名 | ロール名 | PUBLIC };
+
+●ストアドプログラム作成の権限
+CREATE PROCEDURE ... 現行のスキーマにプロシージャ、ファンクション、パッケージを作成出来る
+CREATE ANY PROCEDURE ... 任意のスキーマのプロシージャ、ファンクション、パッケージを作成できる
+ALTER ANY PROCEDURE ... 任意のスキーマのプロシージャ、ファンクション、パッケージを変更できる
+DROP ANY PROCEDURE ... 任意のスキーマのプロシージャ、ファンクション、パッケージを削除する
+CREATE TRIGGER ... 現行のスキーマにトリガーを作成する
+CREATE ANY TRIGGER ... 任意のスキーマにトリガーを作成する
+ALTER ANY TRIGGER ... 任意のスキーマのトリガーを変更する
+DROP ANY TRIGGER ... 任意のスキーマのトリガーを削除する
+ADMINISTER DATABASE TRIGGER ... データベースレベルのDDLイベント、システムイベントトリガーを作成する
+
+※ストアドプログラムの所有者であれば、削除と変更は自由にできる
+
+PL/SQL Silver 黒本P312～313
+
+●列の区切りをカンマ区切りにする
+SQL>
+SQL> set colsep ,     -- カンマを指定
+SQL>
+SQL> select * from tab;
+TNAME                   ,TABTYPE, CLUSTERID
+------------------------------,-------,----------
+AUDIT_TABLE         ,TABLE ,
+BONUS                   ,TABLE ,
+CUST                      ,TABLE ,
+DEPT                      ,TABLE ,
+DEPTREE               ,VIEW ,
+DEPTREE_TEMPTAB ,TABLE ,
+EMP                       ,TABLE ,
+EMPDEPT              ,VIEW ,
+ICE_CREAM           ,TABLE ,
+ICE_CREAM_TAB   ,TABLE ,
+IDEPTREE              ,VIEW ,
+SALGRADE            ,TABLE ,
+12行が選択されました。
+
+※但し、カンマと値の間にスペースが入ってしまう。
+
+●結合Viewに対する更新
+-- 結合viewに対する更新トリガー
+CREATE OR REPLACE TRIGGER emp_dept
+     INSTEAD OF
+     UPDATE
+     ON emp_dept
+     REFERENCING OLD AS o NEW AS n     -- OLD、NEWは名前を変更することができる（任意）
+BEGIN
+     IF UPDATING('dname') THEN
+          UPDATE dept SET dname =:n.dname
+               WHERE deptno =:o.deptno;
+     END IF;
+END emp_dept;
+/
+show errors
+
+(PL/SQL Silver 黒本 P275)
+
+●トリガーの削除
+DROP TRIGGER トリガー名;
+
+●トリガーの状態変更
+・トリガー単体の状態変更
+ALTER TRIGGER トリガー名 ENABLE(またはDISABLE)
+ 
+例：
+ALTER TRIGGER check_sal ENABLE;
+ 
+・テーブルごとの状態変更
+ ALTER TABLE テーブル名 ENABLE(またはDISABLE) ALL TRIGGERS
+
+トリガーの状態変更の確認
+SELECT trigger_name, trigger_type, table_name, status
+FROM user_triggers;
+
+status列がDISABLEDならば、トリガーは動作不能である。
+
+●BFILEのフェッチ
+DECLARE
+    lob_loc BFILE;
+    v_dir  VARCHAR2(30);
+    v_file VARCHAR2(30);
+BEGIN
+    FOR rec IN (SELECT empno, pict2 FROM emp_rep) LOOP
+        --ディレクトリ名とファイル名の取得
+        DBMS_LOB.FILEGETNAME(rec.pict2, v_dir, v_file);
+        --ディレクトリ名とファイル名を表示
+        DBMS_OUTPUT.PUTLINE(rec.empno || ':' || v_dir  || ':' || v_file);
+    END LOOP
+END;
+/
+
+(PL/SQL Silver 黒本 P224）
+
+●BFILENAMEファンクション使用例
+--ディレクトリオブジェクトlob_dirをディレクトリ「/pict」に作成
+CREATE DIRECTORY lob_dir AS '/pict';
+
+--ディレクトリオブジェクトの読み取り権限をscottユーザに付与
+GRANT READ ON DIRECTORY lob_dir TO scott;
+
+--BFILE型データ型の列を追加
+ALTER TABLE emp_rep ADD pict2 BFILE;
+
+--レコード挿入。pict2列には「/pict/scott.jpg」へのポインタ格納
+INSERT INTO emp_rec (empno, ename, pict2)
+    VALUES (1000, 'SCOTT', BFILENAME('LOB_DIR', 'scott.jpg'));
+
+
+※BFILENAMEでは、ファイルの存在チェックをしていないため、
+ファイル名が間違っている場合、INSERT文は成功するが、
+その後のSELECT文で実行時エラーになる。
+
+(PL/SQL Silver 黒本 P220)
+
+●BFILENAMEファンクション使用例その２
+--BFILEの存在チェックをしてからUPDATEするストアド
+CREATE OR REPLACE PROCEDURE load_proc(
+    p_empno emp_rep.empno%TYPE,
+    p_dir VARCHAR2,
+    p_file VARCHAR2)
+AS
+    lob_loc BFILE;
+BEGIN
+    lob_loc := BFILENAME(UPPER(p_dir), p_file);
+    --ファイル存在チェック（1は存在する）
+    IF DBMS_LOB.FILEEXISTS(lob_loc)=1 THEN
+        --ファイルをOPEN
+        DBMS_LOB.OPEN(lob_loc);
+        --LOBロケータを列に格納
+        UPDATE emp_rep SET pict2=lob_loc
+            WHERE emp_no=p_empno;
+        --ファイルをCLOSE
+        DBMS_LOB.CLOSE(lob_loc);
+   ELSE
+       DBMS_OUTPUT.PUTLINE('ファイルが存在しません');
+   END IF;
+END load_proc;
+/
+
+●DBMS_METADATAパッケージ
+テーブルや索引などのメタデータ（データディクショナリに格納されているもの）を確認できる。
+
+例：）
+-- SCOTTスキーマのDEPTテーブルのメタデータを確認
+SELECT DBMS_METADATA.GET_DDL('TABLE', 'DEPT', 'SCOTT') FROM dual;
+
+-- SCOTTに付与されたシステム権限を確認
+SELECT DBMS_METADATA.GET_GRANT_DDL('SYSTEM_GRANT', 'SCOTT') FROM dual;
+
+DBMS_METADATA.GET_xxxは戻り値がCLOB型データ型である。
+SQLPlusで結果が表示しきれない場合はSET LONGコマンドで出力サイズを大きくしておくこと。
+
+●AUTHID CURRENT_USER
+プロシージャを実行者の権限で動作させることを定義する。
+
+例：）
+CREATE OR REPLACE PROCEDURE proc1 (
+     p_tab IN VARCHAR2)
+ AUTHID CURRENT_USER
+AS
+....
+BEGIN
+....
+END proc1;
+/
+
+●ビルトインパッケージの定義のありか
+$ORACLE_HOME/rdbms/admin/catproc.sql
+
+●STANDARD、DBMS_STANDARDパッケージの定義の在処
+$ORACLE_HOME/rdbms/admin/standard.sql
+$ORACLE_HOME/rdbms/admin/dbmsstdx.sql
+
+●コレクションのEXTENDメソッド
+EXTENDメソッドにてコレクションを拡張するとき、1つ目の引数は拡張する要素数です。2つ目の引数は、コピーする要素番号です。指定しなければ、空の要素が追加されます。
+例:)
+CREATE TYPE nst_typ AS TABLE OF NUMBER;
+/
+DECLARE
+  items nst_typ;
+BEGIN
+  items := nst_typ(11,22,33,44);
+  items.DELETE(2);  --削除しても添字自体の変更はない。
+  DBMS_OUTPUT.PUT_LINE(items.COUNT);  --3を表示
+  DBMS_OUTPUT.PUT_LINE(items.LAST);  --4を表示
+  --要素を４つ追加。中身は添字3のもの(33)をコピー
+  items.EXTEND(4,3);
+END;
+/
+
+●外部Cプロシージャについて
+・外部プロシージャ:C言語で記述されたコード
+・共有ライブラリ:外部プロシージャを格納しているOS上のファイル
+
+・別名ライブラリ:共有ライブラリをあらわすデータベース内のオブジェクト
+・PL/SQLサブプログラム:共有ライブラリとPL/SQLのマッピングを定義したプロシージャ、ファンクション、パッケージ
+・extprocプロセス:外部プロシージャを実行するためのセッション固有のプロセス
+・リスナープロセス:extprocプロセスを起動し、PL/SQLサブプログラムを実行するサーバープロセスに割り当てるプロセス
+
+外部Cプロシージャをコールする場合、次の処理が行われます。
+
+(1)アプリケーション側で、PL/SQLサブプログラムをコール
+(2)サーバープロセスにて、別名ライブラリを検索するPL/SQLサブプログラムを実行
+(3)PL/SQLサブプログラムが、リスナーに要求を渡す
+
+(4)リスナープロセスが、extprocプロセスを起動
+(5)extprocプロセスが、共有ライブラリをロード
+(6)extprocプロセスが、外部プロシージャを実行
+(7)extprocプロセスからデータとステータスがサーバープロセスに戻される
+
+●コレクションメソッドの使用例
+コレクションメソッドの使用例
+配列型で使えるメソッドのサンプル。
+ 
+set serveroutput on
+DECLARE
+    --VARCHAR2(10)の配列の型を宣言
+    TYPE tab IS TABLE OF VARCHAR2(10)
+        INDEX BY PLS_INTEGER;
+    col_table tab;
+BEGIN
+    col_table(1) := 'Part1';
+    col_table(100) := 'Part100';
+    col_table(5) := 'Part5';
+    
+    --配列のサイズを返す
+    DBMS_OUTPUT.PUT_LINE(col_table.COUNT);
+    --最初のインデックスを返す
+    DBMS_OUTPUT.PUT_LINE(col_table.FIRST);
+    --最後(最大)のインデックスを返す
+    DBMS_OUTPUT.PUT_LINE(col_table.LAST);
+    --引数の前のインデックスを返す
+    DBMS_OUTPUT.PUT_LINE(col_table.PRIOR(100));
+    --引数の後のインデックスを返す(添え字に文字を使っている場合、次の文字コードの添え字が出てくる)
+    DBMS_OUTPUT.PUT_LINE(col_table.NEXT(1));
+    
+END;
+ 
+(実行結果：)
+SQL> @C:\Home\Src\PLSQL\ArraySample.sql
+3
+1
+100
+5
+5
+
+PL/SQLプロシージャが正常に完了しました。
+
+●VARRAYのTRIMメソッド
+SQL> DECLARE
+  2    -- VARRAY型宣言
+  3    TYPE num_typ IS VARRAY(5) OF NUMBER(2);
+  4    -- VARRAYの変数宣言と5つの要素の代入
+  5    num1 num_typ := num_typ(10,20,30,40,50);
+  6  BEGIN
+  7    -- 最後の2つの要素の削除
+  8    num1.TRIM(2);
+  9    -- 残りの要素の出力
+ 10    FOR i IN num1.FIRST .. num1.LAST LOOP
+ 11      DBMS_OUTPUT.PUT(num1(i)||' ');
+ 12    END LOOP;
+ 13    DBMS_OUTPUT.NEW_LINE;
+ 14  END;
+ 15  /
+VARRAY型にDELETEメソッドを使用することはできませんが、TRIMメソッドは可能です。そのため、エラーにはなりません。
+
+●ネストした表でのインサート
+CREATE TYPE item_typ AS OBJECT (prodid NUMBER(5),price NUMBER(7,2)) ;
+CREATE TYPE item_typ_nst AS TABLE OF item_typ ;
+CREATE TABLE orders( orderid NUMBER(5), ordered DATE, items item_typ_nst) 
+  NESTED TABLE items STORE AS items_tab ;
+-- レコードとして
+INSERT INSERT INTO orders VALUES(1000,SYSDATE,item_typ_nst()); 
+-- ピースのINSERT 
+INSERT INTO TABLE(SELECT items FROM orders WHERE orderid=1000) VALUES(item_typ(10,130.50));
+
+●オブジェクト型とVARRAY型のサンプル
+-- オブジェクト型の作成(構造体のようなもの。CREATE TYPEで作成しておけば、Tableの列にもできる)
+CREATE TYPE item_typ AS OBJECT(
+  prod_id NUMBER(5),price NUMBER(7,2));
+
+-- VARRAY型の作成(item_typにて2つのデータを格納し、最大3つの要素が格納できるコレクション)
+CREATE TYPE item_list AS VARRAY(3) OF item_typ;
+
+-- VARRAYを列として宣言(格納セグメント名はitem_tab)
+CREATE TABLE order_items(
+  order_id NUMBER(5),supplier NUMBER(5),ordered DATE,
+  items item_list);
+
+VARRAYにデータを格納するには、INSERT文にてコレクションメソッドを使用します。
+-- 3つの要素をINSERT文で追加
+INSERT INTO order_items VALUES(100,10,SYSDATE,
+  item_list(item_typ(11,5000),item_typ(12,3000),item_typ(13,4000)));
+
+-- VARRAYの要素をNULLとして追加(初期化なし)
+INSERT INTO order_items VALUES(101,15,SYSDATE,NULL);
+SQL> DECLARE
+  2    -- VARRAY型の変数宣言と初期化
+  3    v_items item_list := item_list();
+  4  BEGIN
+  5    -- 要素を3つ格納できるように拡張。これがないと実行時エラーとなる。
+  6    v_items.EXTEND(3);
+  7    v_items(1) := item_typ(15,2000);
+  8    v_items(2) := item_typ(12,3000);
+  9    v_items(3) := item_typ(11,5000);
+ 10    UPDATE order_items SET items=v_items WHERE order_id=101;
+ 11  END;
+
+●VARRAYのサンプル
+CREATE OR REPLACE PROCEDURE RIVUS.INITIAL_TEST3
+IS
+        -- 一元配列でNULLを許可しない
+        TYPE tArray10 IS VARRAY(100) OF VARCHAR2(10) NOT NULL;
+        vName_List tArray10 := tArray10('AAA','BBB');
+        vEmpty_List tArray10 := tArray10();
+        vNULL_List tArray10;
+BEGIN
+        -- 添え字に数値へと暗黙変換できない文字列は使用できない。
+        vName_List('1.5') := 'ABC';　-- OK (=2)
+        --
+        -- vName_List(50) := 'ABC';   -- 拡張されていない範囲への代入はエラー
+        -- 
+        vName_List.EXTEND(50);    -- 配列を +50 個初期化(=52)
+        vName_List(50) := 'ABC';
+        vName_List(52) := 'ABC';
+--   vName_List(53) := 'ABC';        -- エラーになる。
+--   vName_List.EXTEND(50);  -- さらに +50 すると宣言時の 100 を超えエラーになる。
+        vName_List.EXTEND(48);
+ 
+        vEmpty_List.EXTEND(50);   -- 配列を +50 個初期化(50)
+ 
+--   vNULL_List.EXTEND(50);  -- エラーになる。
+        vNULL_List := tArray10();
+        vNULL_List.EXTEND(50);    -- OK
+        -- ...
+        vName_List.DELETE;
+        vEmpty_List.DELETE;
+        vNULL_List.DELETE;
+END;
+/
+
+●コレクションのDeleteメソッド
+Deleteメソッドで削除しても、値が消えるだけで要素のメモリ領域が消されるわけではない。
+その要素に値があるかどうかのチェックをするべきである。
+
+例:)
+SQL> DECLARE
+  2    -- ネストした表の型宣言
+  3    TYPE num_typ IS TABLE OF NUMBER(2);
+  4    -- ネストした表の変数宣言と5つの要素の代入
+  5    num1 num_typ := num_typ(10,20,30,40,50);
+  6  BEGIN
+  7    -- 2番目の要素の削除
+  8    num1.DELETE(2);
+  9    -- 残りの要素の出力
+ 10    FOR i IN num1.FIRST .. num1.LAST LOOP
+ 11      -- 添え字の存在チェック
+ 12      IF num1.EXISTS(i) THEN
+ 13        DBMS_OUTPUT.PUT(num1(i)||' ');
+ 14      END IF;
+ 15    END LOOP;
+ 16    DBMS_OUTPUT.NEW_LINE;
+ 17  END;
+ 18  /
+
+（出力結果）
+10 30 40 50
+
+●データ型の精度は上書き出来る
+例:)
+SUBTYPE typ2 IS NUMBER(3,2)  --最大3桁、うち小数点2桁と指定
+
+--変数宣言時、精度を最大5桁、うち小数点2桁に変更
+var4 typ2(5,2);
+
+●インラインビュー
+インラインビューとは、from句の後ろに記述されるサブクエリのこと。
+select * from abc (select ....) def
+というSQL文があった場合、(select ....)の部分がインラインビューというらしい。
+PL/SQLでこの部分にCHAR型の列に対してMIN関数、MAX関数を使ったり、文字連結、CONCAT関数を使うとエラーになるらしい。
+
+●JOBの実行
+DBMS_JOBパッケージを使用することにより、JOBキューにストアドを登録して、
+定期的にストアドを実行する。
+
+--登録例
+DECLARE
+	num BINARY_INTEGER;
+BEGIN
+	--第一引数はJOB番号を受け取るためのOUTパラメータ、
+	--第二引数はストアド名
+	--第三引数は初回実行日時
+	--第四引数は次回実行日時。ここでは、1分後
+	DBMS_JOB.SUBMIT(num, 'JOB_TEST', sysdate, 'sysdate+1/1440');
+END;
+/
+
+COMMIT;    --COMMITでストアドがJOBキューに登録される。
+
+--JOBの確認
+SELECT
+	job,         --ジョブ番号
+	what,        --ストアド名
+	TO_CHAR(last_date, 'HH24:MI:SS'),   --最終実行日時
+	TO_CHAR(next_date, 'HH24:MI:SS')    --次回実行日時
+FROM user_job;
+
+
+--ジョブの削除
+execute DBMS_JOB.REMOVE(ジョブ番号);
+
+●トランザクションに依存しないイベント通知
+--送信側プログラムの作成
+CREATE OR REPLACE PROCEDURE pipe_sent
+IS
+	stat INTEGER;
+BEGIN
+	DBMS_PIPE.RESET_BUFFER;
+	--ローカルバッファにメッセージ格納
+	DBMS_PIPE.PACK_MESSAGE('メッセージ送信！！');
+	--パイプ(mod_pipe)にメッセージ送信。パイプmod_pipeができていないときは暗黙的に作成
+	stat := DBMS_PIPE.SEND_MESSAGE('mod_pipe', 30);
+        
+END;
+/
+show errors
+
+--受信側プログラムを作成
+CREATE OR REPLACE PROCEDURE pipe_recive
+IS
+	msg VARCHAR2(4000);
+	stat INTEGER := 0;
+	tim NUMBER := 900;
+	pipe_end EXCEPTION;
+	PRAGMA EXCEPTION_INIT(pipe_end, -06556);
+BEGIN
+	LOOP
+		--パイプmod_pipeからメッセージを受け取り、ローカルバッファに格納
+		stat := DBMS_PIPE.RECEIVE_MESSAGE('mod_pipe', tim);
+		--ローカルバッファから変数に値を格納
+		DBMS_PIPE.UNPACK_MESSAGE(msg);
+		DBMS_OUTPUT.PUT_LINE(msg);
+		tim := 1;
+	END LOOP;
+EXCEPTION
+	--タイムアウトエラーならそのまま終了
+	WHEN pipe_end THEN NULL;
+END;
+/
+show errors
+
+(実行手順)
+1.受信側ストアドを実行。待機状態になる
+2.送信側ストアドを実行
+  受信側ストアドがパイプからメッセージ取得
+
+(実行結果:送信側)
+SQL> execute pipe_sent;
+
+PL/SQLプロシージャが正常に完了しました。
+
+
+(実行結果:受信側)
+SQL> execute pipe_recive;   --パイプにメッセージが書き込まれるまで待機
+メッセージ送信！！          --送信側のストアドが実行されるとすぐ表示。
+
+PL/SQLプロシージャが正常に完了しました。
+
+●イベント通知を非同期で行う
+DBMS_ALERTパッケージを使う
+ 
+# 事前準備として、DBMS_ALERTの実行権限を与えておく
+--まずは、アラートを発生させるプロシージャを書く
+create or replace procedure alert_sent
+IS
+BEGIN
+    DBMS_ALERT.SIGNAL('ALERT_TEST', 'アラート発生！！');
+END;
+/
+
+
+--待機側のプロシージャを書く
+CREATE OR REPLACE PROCEDURE alert_wait
+IS
+    status INTEGER;
+    mes    VARCHAR2(2000);
+BEGIN
+    --送信側プロシージャを登録
+    DBMS_ALERT.REGISTER('ALERT_TEST');
+    --ここで待機
+    DBMS_ALERT.WAITONE('ALERT_TEST', mes, status);
+    IF status = 1 THEN RETURN;
+    END IF;
+    
+    DBMS_OUTPUT.PUT_LINE(mes);
+    --送信側プロシージャの登録解除
+    DBMS_ALERT.REMOVE('ALERT_TEST');
+END;
+/
+
+(実行手順)
+待機側のプロシージャを実行
+送信側のプロシージャを実行
+送信側でCOMMIT文を投げる
+
+(送信側の実行結果)
+SQL> execute alert_sent;
+
+PL/SQLプロシージャが正常に完了しました。
+
+SQL> commit;
+
+コミットが完了しました。
+
+(受信側の実行結果)
+SQL> set serveroutput on;
+SQL> execute alert_wait;       --送信側がCOMMITするまでこのままになる
+アラート発生！！               --コミット後、メッセージを受け取る
+
+PL/SQLプロシージャが正常に完了しました。
+
+●DBMS_SQLパッケージ
+Oracle8iまでで動的SQL文を発行したい場合に用いるパッケージ。
+
+●ソースコードを隠蔽する
+WRAPユーティリティを使う
+但し、トリガーは隠蔽できない
+
+●ネストした表を返す関数(パイプライン関数)
+# コレクション行を作成する度に値を返してくる。Ora9i以降。
+# 普通にネスト表を返してくるより効率的
+
+--ネスト表型のオブジェクトを作成しておく
+CREATE OR REPLACE TYPE nested_type IS TABLE OF VARCHAR2(10);
+/
+
+CREATE OR REPLACE FUNCTION tab_fun
+RETURN nested_type PIPELINED
+IS
+    --初期化しておく
+    nest nested_type := nested_type();
+    
+BEGIN
+    FOR i IN 1..3 LOOP
+        nest.extend;
+        nest(i) := 'Part' || i;
+        --随時データを戻す
+        PIPE ROW(nest(i));
+    END LOOP;
+    RETURN;
+END;
+/
+
+（実行結果：SQL文で使える）
+SQL> select * from table(tab_fun);
+
+COLUMN_VAL
+----------
+Part1
+Part2
+Part3
+
+●作成したコレクション情報の確認
+# 「カラムに配列を格納する」参照
+ 
+SQL> SELECT type_name, typecode FROM user_types;
+
+TYPE_NAME                      TYPECODE
+------------------------------ ------------------------------
+TOPPING_TYPE                   COLLECTION
+
+●カラムに配列を格納する
+ネストした表型をテーブルのカラムの型に指定する
+
+例：
+1.まず、ネストした表型のオブジェクトを作成する
+  以下の例はVARCHAR2(10)の配列型
+CREATE TYPE topping_type IS TABLE OF VARCHAR2(10);
+/
+
+2.ネストした表型のカラムを持つテーブルを作成
+CREATE TABLE ice_cream(
+        name VARCHAR2(10),
+        topping topping_type)
+        NESTED TABLE topping STORE AS ice_cream_tab;
+        
+#NESTED TABLE topping STORE AS ice_cream_tabの意味がよくわからないのだが…
+
+3.INSERTしてみる
+INSERT INTO ice_cream VALUES ('VANILLA', topping_type('JAM', 'COOKIE', 'CRAEM'));
+
+
+4.SELECTしてみる
+SQL> select * from ice_cream;
+
+NAME
+----------
+TOPPING
+--------------------------------------------------------------------------------
+VANILLA
+TOPPING_TYPE('JAM', 'COOKIE', 'CRAEM')
+
+
+5.UPDATEしてみる
+SQL> UPDATE ice_cream
+  2     SET topping = topping_type('CHOCOLATE','JAM','COOKIE', 'CREAM')
+  3     WHERE name = 'VANILLA';
+
+1行が更新されました。
+
+SQL> select * from ice_cream;
+
+NAME
+----------
+TOPPING
+--------------------------------------------------------------------------------
+VANILLA
+TOPPING_TYPE('CHOCOLATE', 'JAM', 'COOKIE', 'CREAM')
+
+
+6.toppingのところだけDELETEしてみる
+DELETE FROM TABLE
+        (SELECT topping FROM ice_cream WHERE name = 'VANILLA');
+
+SQL> select * from ice_cream;
+
+NAME
+----------
+TOPPING
+--------------------------------------------------------------------------------
+VANILLA
+TOPPING_TYPE()
+
+
+●レコードの結合配列のサンプル
+# 結合配列は別名索引付き表、PL/SQL表とも言われる
+ 
+set serveroutput on
+DECLARE
+    TYPE tab IS TABLE OF dept%ROWTYPE
+        INDEX BY PLS_INTEGER;
+    table_rec tab;
+    CURSOR dept_cl IS SELECT * FROM dept;
+    n NUMBER := 0;
+BEGIN
+    
+    FOR r IN dept_cl LOOP
+        n := n + 1;
+        table_rec(n) := r;
+        DBMS_OUTPUT.PUT_LINE(table_rec(n).deptno || ' ' ||
+                            table_rec(n).dname  || ' ' ||
+                            table_rec(n).loc );
+    END LOOP;
+END;
+/
+ 
+(実行結果)
+SQL> @C:\Home\Src\PLSQL\RecordArraySample.sql
+10 ACCOUNTING NEW YORK
+20 RESEARCH DALLAS
+30 SALES CHICAGO
+40 OPERATIONS BOSTON
+50 SSE NISHISHINJUKU
+
+PL/SQLプロシージャが正常に完了しました。
+
+●システムイベントで起動するトリガー
+例としてシステムイベントSERVERERRORで起動するトリガーを作成し、
+そのトリガーでエラーを起こしたユーザとエラー番号を記録する。
+但し、システムイベントSERVERERRORは18、20、1034、1403、1422、1423、4030では発生しない
+ 
+（SYSTEMユーザでテーブルとトリガーを作成）
+# テーブルの作成
+create table log_table(time date,
+                       username varchar2(16),
+                       error_num NUMBER);
+
+# トリガーの作成
+CREATE OR REPLACE TRIGGER event_tri
+--ON DATABASEを指定するとORACLE全体を処理対象とする
+--全てのユーザに対し、このトリガーが適用される
+AFTER SERVERERROR ON DATABASE
+BEGIN
+    --ログインユーザとエラー番号をイベント属性関数を使って書き込む
+    INSERT INTO log_table VALUES
+        (sysdate, ora_login_user, ora_server_error(1));
+END;
+/
+show errors
+ 
+ 
+（実行結果）
+・SYSTEMユーザ側
+SQL> CREATE OR REPLACE TRIGGER event_tri
+  2  --ON DATABASEを指定するとORACLE全体を処理対象とする
+  3  --全てのユーザに対し、このトリガーが適用される
+  4  AFTER SERVERERROR ON DATABASE
+  5  BEGIN
+  6      INSERT INTO log_table VALUES
+  7          (sysdate, ora_login_user, ora_server_error(1));
+  8  END;
+  9  /
+
+トリガーが作成されました。
+
+SQL> show errors
+エラーはありません。
+SQL> select to_char(time, 'YYYY-MM-DD HH24:MI:SS') as time, username, error_num
+  2  from log_table;
+
+TIME                USERNAME          ERROR_NUM
+------------------- ---------------- ----------
+2009-07-21 10:57:13 SCOTT                   942
+2009-07-21 10:58:53 SCOTT                   942
+ 
+ 
+・Scottユーザ側
+SQL> INSERT INTO test_tab VALUES (100);
+INSERT INTO test_tab VALUES (100)
+            *
+行1でエラーが発生しました。:
+ORA-00942: 表またはビューが存在しません。
+
+
+SQL> select to_char(time, 'YYYY-MM-DD HH24:MI:SS') as time, username, error_num
+  2  from log_table;
+from log_table
+     *
+行2でエラーが発生しました。:
+ORA-00942: 表またはビューが存在しません。
+
+●結合Viewに対する更新、削除
+INSTEAD OF トリガーを使う
+ 
+例：
+(操作されるView)
+create view empdept
+as select ename, dname from emp, dept
+where emp.deptno = dept.deptno;
+ 
+(削除時に動作するINSTEAD OF トリガー)
+CREATE OR REPLACE TRIGGER instead_tri
+INSTEAD OF DELETE ON empdept
+BEGIN
+    DELETE FROM emp
+        WHERE ename = :old.ename;
+    DBMS_OUTPUT.PUT_LINE(:old.ename);
+END;
+/
+show errors
+ 
+(実行結果)
+SQL> set serveroutput on
+SQL> delete from empdept where ename = 'SMITH';
+SMITH
+
+1行が削除されました。
+ 
+# 注意事項
+Oracle8iR8.1.5から使用可能
+UPDATEに列リストを指定できない（UPDATE OF 列名ができない）
+BEFOREオプション、AFTERオプションは使用できない
+
+●自律型トランザクション
+PRAGMA AUTONOMOUS_TRANSACTION句を宣言すると、
+呼び出し元とは別のトランザクションでそのストアド、トリガーを実行できる。
+呼び出し元がロールバックなりエラーなりでトランザクションが終了した場合でも、
+監査表に記録を残しておきたい、という場合のなどに使う。
+
+例：トリガーの作成
+CREATE OR REPLACE TRIGGER modify_emp2
+AFTER INSERT OR UPDATE OR DELETE ON emp
+FOR EACH ROW
+DECLARE
+    --自律型トランザクション宣言
+    PRAGMA AUTONOMOUS_TRANSACTION;
+BEGIN
+    IF INSERTING THEN
+        INSERT INTO audit_table
+            VALUES ('EMP', 'INSERT', :new.empno);
+    ELSIF DELETING THEN
+        INSERT INTO audit_table
+            VALUES ('EMP', 'DELETE', :old.empno);
+    ELSIF UPDATING THEN
+        INSERT INTO audit_table
+            VALUES ('EMP', 'UPDATE', :old.empno);
+    END IF;
+    --自律型トランザクション宣言した場合、COMMITしないとエラーとなる
+    COMMIT;
+END;
+/
+
+●依存性の確認
+依存性を確認したいプロシージャの持ち主のユーザでログインし、
+utldtree.sqlスクリプトを実行する。
+deptreeビュー、ideptreeビュー、deptree_fillプロシージャを作製する
+
+@%ORACLE_HOME%\rdbms\admin\utldtree.sql
+
+# エラーがたくさん出るが、ビューのDrop文のエラーの場合は気にせず続ける
+
+# 調査するためのストプロを実行する
+# 引数は調査するオブジェクトのタイプ、オブジェクトの所有者、調査するオブジェクト名
+SQL> execute deptree_fill('TABLE', 'SCOTT', 'EMP')
+
+PL/SQLプロシージャが正常に完了しました。
+
+# 依存状態を確認するSQL文を発行
+select nested_level, type, name
+from deptree
+order by seq#;
+
+NESTED_LEVEL TYPE                NAME
+------------ ------------------- ------------------------------
+           0 TABLE               EMP
+           1 PROCEDURE           CALLEMP
+           2 PROCEDURE           CALLEMP_NEST
+           1 TRIGGER             EMP_NOMOD
+           1 TRIGGER             MODIFY_EMP
+           1 TRIGGER             CHECK_SAL
+           1 PROCEDURE           OPEN_DATA
+           1 PROCEDURE           OPEN_EMP
+           1 PROCEDURE           DEL_CASCADE
+           1 PROCEDURE           BULK_RETURNING
+
+9行が選択されました。
+
+# NESTED_LEVELは1が直接、2は間接。
+
+# 依存状態を確認するSQL文を発行
+# DEPENDENCIESはインデントされて表示される
+SQL> SELECT * FROM ideptree
+  2  ORDER BY dependencies DESC;
+
+DEPENDENCIES
+--------------------------------------------------------------------------------
+TABLE SCOTT.EMP
+   TRIGGER SCOTT.MODIFY_EMP
+   TRIGGER SCOTT.EMP_NOMOD
+   TRIGGER SCOTT.CHECK_SAL
+   PROCEDURE SCOTT.OPEN_EMP
+   PROCEDURE SCOTT.OPEN_DATA
+   PROCEDURE SCOTT.DEL_CASCADE
+   PROCEDURE SCOTT.CALLEMP
+   PROCEDURE SCOTT.BULK_RETURNING
+      PROCEDURE SCOTT.CALLEMP_NEST
+
+10行が選択されました。
+
+●実行者権限の指定
+ストプロでAUTHID CURRENT_USER句を追加すると、EXECUTE権限が付与された実行者のオブジェクトが変更される。
+
+例：
+CREATE OR REPLACE PROCEDURE emp_upsal
+AUTHID CURRENT_USER
+IS
+BEGIN
+        UPDATE emp
+        SET sal = 1000
+        WHERE empno = 7369;
+END;
+/
+
+# このプロシージャがjohnユーザで作成されたとすると、更新される表はjphn.empである。
+しかし、scottユーザにこのプロシージャの実行権限を与えて、scottユーザで実行すると、
+scott.empが更新される。
+
+DBMS_PROFILERパッケージを使ったボトルネックの検出(事前準備)
+1.事前準備としてDBMS_PROFILERパッケージをSYSユーザでインストールする
+SQL> conn sys/orcl as sysdba
+接続されました。
+
+SQL> @%ORACLE_HOME%\rdbms\admin\profload.sql
+
+パッケージが作成されました。
+
+
+権限付与が成功しました。
+
+
+シノニムが作成されました。
+
+
+ライブラリが作成されました。
+
+
+パッケージ本体が作成されました。
+
+Testing for correct installation
+SYS.DBMS_PROFILER successfully loaded.
+
+PL/SQLプロシージャが正常に完了しました。
+
+2.事前準備としてパフォーマンス情報を格納する表を作成する
+SQL> @%ORACLE_HOME%\rdbms\admin\proftab.sql
+
+表が作成されました。
+
+コメントが作成されました。
+
+表が作成されました。
+
+コメントが作成されました。
+
+表が作成されました。
+
+コメントが作成されました。
+
+順序が作成されました。
+
+# PLSQL_PROFILER_RUNS表
+実行ユーザや実行時刻などを格納している
+
+# PLSQL_PROFILER_UNITS表
+調査対象のユニット(プログラム)に関する情報を格納
+
+# PLSQL_PROFILER_DATA表
+実行時間や実行回数などのパフォーマンス情報を格納
+列：
+RUNID：実行ID
+TOTAL_OCCUR：当該行が実行された回数
+TOTAL_LINE：当該行の実行に要した総時間
+LINE#：ユニットにおける行番号
+
+●インデックスが連続していない配列でFORALL文を使う
+INDICES OF句を使う（Oracle10g以降）
+ 
+FORALL 索引名 IN INDICES OF コレクション名
+[BETWEEN 初期値 AND 終了値]
+
+●SELCT文でバルクバインドを使用したサンプル
+DECLARE
+    TYPE emp_type IS TABLE OF emp%ROWTYPE
+        INDEX BY PLS_INTEGER;
+    emp_tab emp_type;
+    
+BEGIN
+    SELECT * BULK COLLECT INTO emp_tab FROM emp
+        WHERE deptno = 20;
+        
+    FOR i IN emp_tab.FIRST..emp_tab.LAST LOOP
+        DBMS_OUTPUT.PUT_LINE(emp_tab(i).ename);
+    END LOOP;
+END;
+ 
+(実行結果)
+SQL> @C:\Home\Src\PLSQL\BulkCollectIntoSample.sql
+SMITH
+JONES
+SCOTT
+ADAMS
+FORD
+
+PL/SQLプロシージャが正常に完了しました。
+
+●バルクバインドのサンプル(Insert文)
+set timing on
+
+declare
+    TYPE num_rec IS TABLE OF cust.custid%TYPE
+        INDEX BY PLS_INTEGER;
+    c_id num_rec;
+    TYPE var_rec IS TABLE OF cust.custno%TYPE
+        INDEX BY PLS_INTEGER;
+    c_no var_rec;
+BEGIN
+    FOR i IN 1..30000 LOOP
+        c_id(i) := i;
+        c_no(i) := 'No.' || TO_CHAR(i);
+    END LOOP;
+    
+    FORALL j IN 1..30000
+        INSERT INTO cust(custid, custno) VALUES(c_id(j), c_no(j));
+        
+END;
+/
+ 
+(実行結果)
+SQL> @C:\Home\Src\PLSQL\ForAllSample.sql
+
+PL/SQLプロシージャが正常に完了しました。
+
+経過: 00:00:00.39
+SQL> select count(*) from cust;
+
+  COUNT(*)
+----------
+     30000
+
+経過: 00:00:00.02
+
+●動的なSQL文(SELECT INTO句)を使ったストアドのサンプル
+CREATE OR REPLACE PROCEDURE select_dept(clause VARCHAR2)
+IS
+    sql_stmt VARCHAR2(100);
+    d_name dept.dname%TYPE;
+BEGIN
+    sql_stmt := 'SELECT dname FROM dept WHERE ' || clause;
+    DBMS_OUTPUT.PUT_LINE(sql_stmt);
+
+    EXECUTE IMMEDIATE sql_stmt INTO d_name;
+    DBMS_OUTPUT.PUT_LINE(d_name);
+    
+END;
+/
+show errors
+ 
+(実行結果：)
+SQL> execute select_dept('deptno=10')
+SELECT dname FROM dept WHERE deptno=10
+ACCOUNTING
+
+PL/SQLプロシージャが正常に完了しました。
+
+●動的なSQL文(DML文)を実行するプロシージャのサンプル
+CREATE OR REPLACE PROCEDURE delete_table(tab_name VARCHAR2,
+                                         clause VARCHAR2)
+IS
+    sql_stmt VARCHAR2(100);
+BEGIN
+    sql_stmt := 'DELETE FROM ' || tab_name || ' WHERE ' || clause;
+    DBMS_OUTPUT.PUT_LINE(sql_stmt);
+
+    EXECUTE IMMEDIATE sql_stmt;
+
+END;
+/
+show errors
+ 
+(実行結果：)
+SQL> execute delete_table('emp', 'deptno = 10')
+DELETE FROM emp WHERE deptno = 10
+
+PL/SQLプロシージャが正常に完了しました。
+
+●プレースフォルダを使った例
+CREATE OR REPLACE PROCEDURE open_emp(no NUMBER,
+                                     nm VARCHAR2)
+IS
+    TYPE cv_type IS REF CURSOR;
+    cur_cv cv_type;
+    emp_rec emp%ROWTYPE;
+BEGIN
+    --USING句は名前でなく位置対応を取る
+    OPEN cur_cv FOR 'SELECT * FROM emp WHERE sal > :val ' ||
+                    'OR ename = :val2 ' USING no, nm;
+    LOOP
+        fetch cur_cv INTO emp_rec;
+        EXIT WHEN cur_cv%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE(emp_rec.ename);
+    END LOOP;
+    CLOSE cur_cv;
+    
+END;
+/
+show errors
+ 
+（実行結果）
+SQL> set serveroutput on
+SQL> execute open_emp(2000, 'KING')
+JONES
+BLAKE
+CLARK
+SCOTT
+KING
+FORD
+
+PL/SQLプロシージャが正常に完了しました。
+
+●OUTモードのプレイスフォルダの例
+CREATE OR REPLACE PROCEDURE del_cascade(clause VARCHAR2,
+                                        val    VARChAR2)
+IS
+    d_deptno dept.deptno%TYPE;
+BEGIN
+    EXECUTE IMMEDIATE
+        'DELETE FROM dept ' ||
+        '   WHERE ' || clause || ' :p_val ' ||
+        '   RETURNING deptno INTO :d_no'
+        USING val, OUT d_deptno;
+    
+    DBMS_OUTPUT.PUT_LINE(d_deptno);
+    UPDATE emp SET deptno = NULL WHERE deptno = d_deptno;
+END;
+/
+show errors
+
+●カーソル変数のサンプル
+CREATE OR REPLACE PROCEDURE open_data(dept_no NUMBER)
+IS
+    --参照カーソルの定義
+    TYPE cv_type IS REF CURSOR;
+    cur_cv cv_type;
+    emp_rec emp%ROWTYPE;
+    dept_rec dept%ROWTYPE;
+BEGIN
+    --カーソルにSQL文を紐付けてOPEN
+    OPEN cur_cv FOR SELECT * FROM emp WHERE deptno = dept_no;
+    LOOP
+        FETCH cur_cv INTO emp_rec;
+        EXIT WHEN cur_cv%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE('EMP ' || emp_rec.ename);
+    END LOOP;
+    CLOSE cur_cv;
+    
+    --カーソル変数は使いまわせる
+    OPEN cur_cv FOR SELECT * FROM dept WHERE deptno = dept_no;
+    LOOP
+        FETCH cur_cv INTO dept_rec;
+        EXIT WHEN cur_cv%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE('DEPT ' || dept_rec.dname);
+    END LOOP;
+    CLOSE cur_cv;
+END;
+/
+ 
+（実行結果：）
+SQL> set serveroutput on
+SQL> execute open_data(10)
+EMP CLARK
+EMP KING
+EMP MILLER
+DEPT ACCOUNTING
+
+PL/SQLプロシージャが正常に完了しました。
+
+
+●カーソル変数を使った動的SQLのサンプル
+CREATE OR REPLACE PROCEDURE open_emp(clause VARCHAR2)
+IS
+    TYPE cv_type IS REF CURSOR;
+    cur_cv cv_type;
+    emp_rec emp%ROWTYPE;
+BEGIN
+    OPEN cur_cv FOR 'SELECT * FROM emp WHERE ' || clause;
+    LOOP
+        fetch cur_cv INTO emp_rec;
+        EXIT WHEN cur_cv%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE(emp_rec.ename);
+    END LOOP;
+    CLOSE cur_cv;
+    
+END;
+/
+show errors
+ 
+(実行結果：)
+SQL> @C:\Home\Src\PLSQL\DynamicCursol.sql
+
+プロシージャが作成されました。
+
+エラーはありません。
+SQL> execute open_emp('sal > 2500')
+JONES
+BLAKE
+CLARK
+SCOTT
+KING
+FORD
+
+PL/SQLプロシージャが正常に完了しました。
+
+●レコード型を使ってINSERT文を簡略化する
+(Oracle9i R9.2以降)
+ 
+(例：)
+set serveroutput on
+DECLARE
+    rec dept%ROWTYPE;
+BEGIN
+    rec.deptno := 50;
+    rec.dname := 'SE';
+    rec.loc := 'DETROIT';
+    
+    INSERT INTO dept VALUES rec;
+    
+END;
+/
+ 
+(実行結果:）
+SQL> set serveroutput on
+SQL> DECLARE
+  2      rec dept%ROWTYPE;
+  3  BEGIN
+  4      rec.deptno := 50;
+  5      rec.dname := 'SE';
+  6      rec.loc := 'DETROIT';
+  7
+  8      INSERT INTO dept VALUES rec;
+  9
+ 10  END;
+ 11  /
+
+PL/SQLプロシージャが正常に完了しました。
+
+SQL> select deptno, dname, loc from dept;
+
+    DEPTNO DNAME          LOC
+---------- -------------- -------------
+        10 ACCOUNTING     NEW YORK
+        20 RESEARCH       DALLAS
+        30 SALES          CHICAGO
+        40 OPERATIONS     BOSTON
+        50 SE             DETROIT
+
+●レコード型を使ってUPDATE文を簡略化する
+(Oracle9i R9.2以降)
+ 
+set serveroutput on
+DECLARE
+    rec dept%ROWTYPE;
+BEGIN
+    --カラムに何も指定しなかった場合はNULLで更新される
+    rec.dname := 'SSE';
+    rec.loc := 'NISHISHINJUKU';
+    rec.deptno := 50;
+    
+    UPDATE  dept SET ROW = rec WHERE deptno = 50;
+    
+END;
+/
+ 
+(実行結果：)
+SQL> set serveroutput on
+SQL> DECLARE
+  2      rec dept%ROWTYPE;
+  3  BEGIN
+  4      --カラムに何も指定しなかった場合はNULLで更新される
+  5      rec.dname := 'SSE';
+  6      rec.loc := 'NISHISHINJUKU';
+  7      rec.deptno := 50;
+  8
+  9      UPDATE  dept SET ROW = rec WHERE deptno = 50;
+ 10
+ 11  END;
+ 12  /
+
+PL/SQLプロシージャが正常に完了しました。
+
+SQL> select deptno, dname, loc from dept;
+
+    DEPTNO DNAME          LOC
+---------- -------------- -------------
+        10 ACCOUNTING     NEW YORK
+        20 RESEARCH       DALLAS
+        30 SALES          CHICAGO
+        40 OPERATIONS     BOSTON
+        50 SSE            NISHISHINJUKU
+
+SQL>
+
+●ユーザ定義レコード使用サンプル
+set serveroutput on
+DECLARE
+    TYPE record_type IS RECORD
+        (a NUMBER(2),
+         b VARCHAR2(6));
+    rec record_type;
+BEGIN
+    rec.a := 1;
+    rec.b := 'REC B';
+    DBMS_OUTPUT.PUT_LINE(rec.a || ' ' || rec.b);
+END;
+/
+ 
+(実行結果)
+SQL> set serveroutput on
+SQL> DECLARE
+  2      TYPE record_type IS RECORD
+  3          (a NUMBER(2),
+  4           b VARCHAR2(6));
+  5      rec record_type;
+  6  BEGIN
+  7      rec.a := 1;
+  8      rec.b := 'REC B';
+  9      DBMS_OUTPUT.PUT_LINE(rec.a || ' ' || rec.b);
+ 10  END;
+ 11  /
+1 REC B
+
+PL/SQLプロシージャが正常に完了しました。
+
+●トリガーの起動条件を指定したサンプル
+CREATE OR REPLACE TRIGGER check_sal
+BEFORE UPDATE OF sal ON emp
+FOR EACH ROW    --行トリガー
+WHEN (new.sal/old.sal<=0.7)    --トリガーの起動条件を設定
+BEGIN
+    raise_application_error(-20005, '規定値を超えた減給です');
+END;
+/
+show errors
+ 
+(実行結果)
+SQL> UPDATE emp SET sal = 500 WHERE empno = 7369;
+UPDATE emp SET sal = 500 WHERE empno = 7369
+       *
+行1でエラーが発生しました。:
+ORA-20005: 規定値を超えた減給です
+ORA-06512: "SCOTT.CHECK_SAL", 行2
+ORA-04088: トリガー'SCOTT.CHECK_SAL'の実行中にエラーが発生しました
+
+
+SQL> select sal, empno from emp where empno = 7369;
+
+       SAL      EMPNO
+---------- ----------
+       800       7369
+
+
+●トリガーの注意点
+トリガー内では、DDL文やトランザクション制御文(commit,rollback)が実行できない
+Rollbackされた内容を監査テーブル等に残したい場合は自律型トランザクションを使用する
+
+●相関名oldとnewを使ったトリガーサンプル
+CREATE OR REPLACE TRIGGER modify_emp
+AFTER INSERT OR UPDATE ON emp
+FOR EACH ROW    --行トリガー
+BEGIN
+    IF INSERTING THEN
+        DBMS_OUTPUT.PUT_LINE('挿入されました empno ' || :new.empno);
+    ELSIF UPDATING THEN
+        DBMS_OUTPUT.PUT_LINE('変更されました 旧empno ' || :old.empno);
+        DBMS_OUTPUT.PUT_LINE('変更されました 新empno ' || :new.empno);
+    ELSE
+        NULL;
+    END IF;
+END;
+/
+show errors
+ 
+(実行結果)
+SQL> INSERT INTO emp (empno) values (2235);
+挿入されました empno 2235
+
+1行が作成されました。
+
+SQL> UPDATE emp SET empno = 9997 where empno = 2235;
+変更されました 旧empno 2235
+変更されました 新empno 9997
+
+1行が更新されました。
+ 
+# :newの値を変更すれば、その値でデータを上書きできる。(BEFOREトリガーのみ)
+
+●依存オブジェクトの確認
+依存オブジェクトとは？
+　あるプロシージャprocAが内部でプロシージャprocBを呼び出している時、
+procAはprocBの依存オブジェクトである、という。
+また逆に、procBはprocAの参照オブジェクトである、ともいう。
+
+テーブルEMPを参照しているプロシージャを探すには、
+以下のようなSQL文を流す
+
+SQL> SELECT name, type FROM user_dependencies
+2 WHERE referenced_name = 'EMP';
+
+NAME TYPE
+------------------------------ ------------------
+CALLEMP PROCEDURE
+
+●トリガーの種類、タイプ
+・種類
+DMLトリガー
+　表に対するDML操作(INSERT、UPDATE、DELETE)で起動する
+
+INSTEAD OFトリガー
+　ビューに対するDML操作で起動する
+
+DDLトリガー
+　DDL操作(CREATE、ALTER、DROP)で起動する
+
+イベントトリガー
+　データベース処理や特定ユーザの処理で起動する
+
+・タイプ
+BEFOREトリガー
+　DML文が実行される前に起動
+
+AFTERトリガー
+　DML文が実行された後に起動
+
+・単位
+文トリガー
+　DML文に対して一回だけ起動
+
+行トリガー
+　DML文が影響を与える行ごとに起動する
+
+●トリガーのサンプル
+CREATE OR REPLACE TRIGGER emp_nomod
+--DML文の前に起動。FOR EACH ROWが指定されていないので、文トリガー
+--UPDATE文を指定した場合は、OF句で列を指定できる
+BEFORE INSERT OR DELETE OR UPDATE ON emp
+DECLARE
+    youbi VARCHAR2(12);
+BEGIN
+    youbi := TO_CHAR(SYSDATE, 'DY');
+    IF(youbi = '金') THEN
+        --条件述語により分岐
+        --削除の場合
+        IF DELETING THEN
+            raise_application_error(-20325, youbi || 'に削除できません');
+        ELSIF INSERTING THEN
+            raise_application_error(-20326, youbi || 'に挿入できません');
+        ELSIF UPDATING THEN
+            raise_application_error(-20327, youbi || 'に更新できません');
+        ELSE
+            raise_application_error(-20328, youbi || 'に変更できません');
+        END IF;
+    ELSE NULL;
+    END IF;
+END;
+/
+show errors
+ 
+(実行結果)
+SQL> UPDATE emp SET sal = 1000 WHERE empno = 7369;
+UPDATE emp SET sal = 1000 WHERE empno = 7369
+       *
+行1でエラーが発生しました。:
+ORA-20327: 金に更新できません
+ORA-06512: "SCOTT.EMP_NOMOD", 行13
+ORA-04088: トリガー'SCOTT.EMP_NOMOD'の実行中にエラーが発生しました
+
+●UTL_FILEパッケージを使ったストアドの例
+1．事前準備
+　　ディレクトリオブジェクトの作成と権限付与
+ 
+SQL> CREATE OR REPLACE DIRECTORY utl_data
+  2  AS 'C:\Home\Src\PLSQL\FileDir';
+
+ディレクトリが作成されました。
+
+SQL> GRANT READ, WRITE ON DIRECTORY utl_data TO scott;
+
+権限付与が成功しました。
+ 
+2．ストアドの作成
+ 
+CREATE OR REPLACE PROCEDURE file_unload_dept
+IS
+    CURSOR dept_cur
+    IS
+        SELECT dname FROM dept;
+    --ファイルハンドルの宣言
+    file_hand UTL_FILE.FILE_TYPE;
+    day       DATE;
+    name      VARCHAR2(20);
+BEGIN
+    SELECT sysdate INTO day FROM dual;
+    name := TO_DATE(day) || 'dept.txt';
+    --ディレクトリオブジェクト名とファイル名を指定し、追加モードでファイルを開く
+    --一度に開けるファイル数は50
+    file_hand := UTL_FILE.FOPEN('UTL_DATA', name, 'a');
+    
+    FOR dept_rec IN dept_cur LOOP
+        --データと改行コードを書き込む
+        UTL_FILE.PUT_LINE(file_hand, dept_rec.dname);
+    END LOOP;
+    UTL_FILE.FCLOSE(file_hand);
+
+END;
+/
+show errors
+ 
+(実行結果：YY-MM-DDdept.txtの中身)
+ACCOUNTING
+RESEARCH
+SALES
+OPERATIONS
+
+●ユーティリティパッケージについて
+ 
+ユーティリティパッケージ(DBMS_OUTPUTパッケージなど)はOracle作成時にcatproc.sqlというスクリプトによって自動作成される。
+
+●パッケージのリコンパイル
+ALTER PACKAGE test_pack COMPILE;
+ 
+# 本体のみのリコンパイル
+ALTER PACKAGE test_pack COMPILE BODY;
+
+●パッケージに宣言されているプロシージャの確認
+ 
+desc パッケージ名
+で、パッケージに宣言されているプロシージャの引数が確認できる
+
+●データベース単位でINVALIDオブジェクトをまとめてリコンパイル
+1.SqlPlusを起動
+　sqlplus /nolog
+ 
+2.sysユーザでログイン
+SQL> conn sys/orcl as sysdba
+接続されました。
+ 
+3.utlrp.sqlスクリプトを実行(途中経過が結構長い)
+SQL> @%ORACLE_HOME%\RDBMS\ADMIN\utlrp.sql
+
+TIMESTAMP
+--------------------------------------------------------------------------------
+COMP_TIMESTAMP UTLRP_BGN  2009-07-17 19:56:00
+
+DOC>   The following PL/SQL block invokes UTL_RECOMP to recompile invalid
+DOC>   objects in the database. Recompilation time is proportional to the
+DOC>   number of invalid objects in the database, so this command may take
+DOC>   a long time to execute on a database with a large number of invalid
+DOC>   objects.
+DOC>
+DOC>   Use the following queries to track recompilation progress:
+DOC>
+DOC>   1. Query returning the number of invalid objects remaining. This
+DOC>      number should decrease with time.
+DOC>         SELECT COUNT(*) FROM obj$ WHERE status IN (4, 5, 6);
+DOC>
+DOC>   2. Query returning the number of objects compiled so far. This number
+DOC>      should increase with time.
+DOC>         SELECT COUNT(*) FROM UTL_RECOMP_COMPILED;
+DOC>
+DOC>   This script automatically chooses serial or parallel recompilation
+DOC>   based on the number of CPUs available (parameter cpu_count) multiplied
+DOC>   by the number of threads per CPU (parameter parallel_threads_per_cpu).
+DOC>   On RAC, this number is added across all RAC nodes.
+DOC>
+DOC>   UTL_RECOMP uses DBMS_SCHEDULER to create jobs for parallel
+DOC>   recompilation. Jobs are created without instance affinity so that they
+DOC>   can migrate across RAC nodes. Use the following queries to verify
+DOC>   whether UTL_RECOMP jobs are being created and run correctly:
+DOC>
+DOC>   1. Query showing jobs created by UTL_RECOMP
+DOC>         SELECT job_name FROM dba_scheduler_jobs
+DOC>            WHERE job_name like 'UTL_RECOMP_SLAVE_%';
+DOC>
+DOC>   2. Query showing UTL_RECOMP jobs that are running
+DOC>         SELECT job_name FROM dba_scheduler_running_jobs
+DOC>            WHERE job_name like 'UTL_RECOMP_SLAVE_%';
+DOC>#
+
+PL/SQLプロシージャが正常に完了しました。
+
+
+TIMESTAMP
+--------------------------------------------------------------------------------
+COMP_TIMESTAMP UTLRP_END  2009-07-17 19:56:02
+
+
+PL/SQLプロシージャが正常に完了しました。
+
+DOC> The following query reports the number of objects that have compiled
+DOC> with errors (objects that compile with errors have status set to 3 in
+DOC> obj$). If the number is higher than expected, please examine the error
+DOC> messages reported with each object (using SHOW ERRORS) to see if they
+DOC> point to system misconfiguration or resource constraints that must be
+DOC> fixed before attempting to recompile these objects.
+DOC>#
+
+OBJECTS WITH ERRORS
+-------------------
+                  0
+
+DOC> The following query reports the number of errors caught during
+DOC> recompilation. If this number is non-zero, please query the error
+DOC> messages in the table UTL_RECOMP_ERRORS to see if any of these errors
+DOC> are due to misconfiguration or resource constraints that must be
+DOC> fixed before objects can compile successfully.
+DOC>#
+
+ERRORS DURING RECOMPILATION
+---------------------------
+                          0
+
+PL/SQLプロシージャが正常に完了しました。
+
+Invoking Ultra Search Install/Upgrade validation procedure VALIDATE_WK
+Ultra Search VALIDATE_WK done with no error
+
+PL/SQLプロシージャが正常に完了しました。
+
+SQL>
+ 
+4.リコンパイルの結果確認
+SQL> SELECT object_name, object_type
+  2  FROM user_objects
+  3  WHERE status = 'INVALID';
+
+レコードが選択されませんでした。
+ 
+#　失敗していれば何かレコードが引っかかる
+
+●スキーマ単位のオブジェクトのリコンパイル
+SQL> EXECUTE DBMS_UTILITY.COMPILE_SCHEMA('SCOTT')
+
+PL/SQLプロシージャが正常に完了しました。
+ 
+#　INVALIDオブジェクトのみリコンパイルする
+SQL> EXECUTE DBMS_UTILITY.COMPILE_SCHEMA('SCOTT', FALSE)
+
+PL/SQLプロシージャが正常に完了しました。
+
+●オブジェクト単位のリコンパイル
+例)プロシージャtriangleをリコンパイル
+ 
+SQL> ALTER PROCEDURE triangle COMPILE;
+
+プロシージャが変更されました。
+
+●プロシージャの状態を確認するSQL
+依存オブジェクトが変更された場合、STATUSがINVALIDになり、リコンパイルが必要になる。
+(但し、INVALIDのプロシージャが呼び出されたとき、勝手にリコンパイルされる)
+ 
+SQL> SELECT object_name, object_type, status
+  2  FROM user_objects
+  3  ORDER BY object_name;
+
+OBJECT_NAME
+----------------------------------------------------------------------------------------------
+
+OBJECT_TYPE         STATUS
+------------------- -------
+BONUS
+TABLE               VALID
+
+CALLEMP
+PROCEDURE           VALID
+
+DEPT
+TABLE               VALID
+
+
+OBJECT_NAME
+----------------------------------------------------------------------------------------------
+
+OBJECT_TYPE         STATUS
+------------------- -------
+EMP
+TABLE               VALID
+
+F_IOTEST
+FUNCTION            VALID
+
+INOUTPROC
+PROCEDURE           VALID
+
+
+OBJECT_NAME
+----------------------------------------------------------------------------------------------
+
+OBJECT_TYPE         STATUS
+------------------- -------
+PK_DEPT
+INDEX               VALID
+
+PK_EMP
+INDEX               VALID
+
+SALGRADE
+TABLE               VALID
+
+OBJECT_NAME
+----------------------------------------------------------------------------------------------
+
+OBJECT_TYPE         STATUS
+------------------- -------
+TRIANGLE
+PROCEDURE           VALID
+
+10行が選択されました。
+
+●ストアドファンクション作成時の注意点
+・引数にOUT引数、IN/OUT引数を指定しない
+　SQL文でそのファンクションを指定すると、実行時にエラーとなる
+
+・COMMIT、ROLLBACK、DLL処理をしない
+　SQL文でそのファンクションを指定できなくなる
+
+・DML処理をしない
+　SQL文でそのファンクションを指定できなくなる。
+　例外的に使用できるケースもあるが…
+
+・実行時にReturn文で終了しない場合、実行時エラーとなる
+
+●ストアドの引数の確認
+ストアドの引数の確認
+データディクショナリのUSER_ARGUMENTSを検索する。
+object_nameにストアド名を大文字で指定
+SQL> SELECT argument_name, data_type, in_out, position
+  2  FROM USER_ARGUMENTS
+  3  WHERE object_name = 'INOUTPROC'
+  4  ORDER BY position;
+
+ARGUMENT_NAME                  DATA_TYPE                      IN_OUT
+------------------------------ ------------------------------ ---------
+  POSITION
+----------
+DEF_NUM                        NUMBER                         IN
+         1
+
+IN_NUM                         NUMBER                         IN
+         2
+
+OUT_NUM                        NUMBER                         OUT
+         3
+ 
+#　SQLPlusコマンドのdescでも確認できる
+#　Default?に「DEFAULT」とある時はデフォルト値が指定されている
+SQL> desc triangle
+PROCEDURE triangle
+ 引数名                         タイプ                  In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ BASE                           NUMBER                  IN     DEFAULT
+ HEIGHT                         NUMBER                  IN     DEFAULT
+
+●ストアドのIN、OUTパラメータ
+CREATE OR REPLACE PROCEDURE InOutProc(def_num NUMBER,    --デフォルトはINパラメータ
+                                      in_num IN NUMBER,
+                                      out_num OUT NUMBER)
+IS
+    area NUMBER;
+BEGIN
+	--INパラメータは定数扱いなので、代入するとコンパイルエラーになる
+    --def_num := def_num + 1;   
+    DBMS_OUTPUT.PUT_LINE('でふぁおると番号' || def_num);
+    out_num := def_num + 1;
+END;
+/
+show errors
+ 
+(実行結果)
+SQL> DECLARE
+  2     out_rel_para NUMBER;
+  3  BEGIN
+  4     InOutProc(1,2,out_rel_para);
+  5     DBMS_OUTPUT.PUT_LINE(out_rel_para);
+  6  END;
+  7  /
+でふぁおると番号1
+2
+
+PL/SQLプロシージャが正常に完了しました。
+ 
+# outパラメータに定数を指定するとエラーとなる
+SQL> DECLARE
+  2     out_rel_para NUMBER;
+  3  BEGIN
+  4     InOutProc(1,2,3);
+  5     DBMS_OUTPUT.PUT_LINE(out_rel_para);
+  6  END;
+  7  /
+        InOutProc(1,2,3);
+                      *
+行4でエラーが発生しました。:
+ORA-06550: 行4、列16:
+PLS-00363: 式3は割当てターゲットとして使用できません。
+ORA-06550: 行4、列2:
+PL/SQL: Statement ignored
+
+●ストアドプロシージャの引数にデフォルト値を設定
+CREATE OR REPLACE PROCEDURE triangle(base NUMBER DEFAULT 10,
+                                     height NUMBER DEFAULT 20)
+IS　　　--実はASでもよい
+    area NUMBER;
+BEGIN
+    area := (base * height)/2;
+    DBMS_OUTPUT.PUT_LINE(area);
+END;
+/
+show errors
+ 
+(実行結果)
+SQL> @C:\Home\Src\PLSQL\defaultparam.sql
+
+プロシージャが作成されました。
+
+エラーはありません。
+
+SQL> set serveroutput on
+SQL> execute triangle(20,20)
+200
+
+PL/SQLプロシージャが正常に完了しました。
+
+SQL> execute triangle(2)
+20
+
+PL/SQLプロシージャが正常に完了しました。
+
+SQL> execute triangle
+100
+
+PL/SQLプロシージャが正常に完了しました。
+ 
+#第二パラメータを指定
+SQL> execute triangle(height=>3)
+15
+
+PL/SQLプロシージャが正常に完了しました。
+ 
+#指定したりしなかったりしても平気
+SQL> execute triangle(10, height=>3)
+15
+
+PL/SQLプロシージャが正常に完了しました。
+
+●WHERE CURRENT OF句
+WHERE CURRENT OF句を使うとROWIDによってアクセスできるので、
+高速に処理できる。
+ただし、FOR UPDATE句を使用していないとできない。
+
+例：）
+set serveroutput on
+
+DECLARE
+  CURSOR emp_cur IS
+    SELECT sal FROM emp
+    WHERE deptno = 10 FOR UPDATE NOWAIT;
+BEGIN
+  FOR emp_rec IN emp_cur LOOP
+    IF emp_rec.sal < 2500 THEN
+      UPDATE emp SET sal = sal+100
+      WHERE CURRENT OF emp_cur;
+    END IF;
+  END LOOP;
+
+END;
+/
+
+●明示カーソル属性
+%NOTFOUND … 直前のFETCH文が行を取り出せた時はTRUE、そうでないときはFALSEを返す
+%FOUND … %NOTFOUNDの逆
+%ROWCOUNT … これまでに取り出された行数
+%ISOPEN…カーソルがOPENしている場合、TRUE
+
+使用例：)
+set serveroutput on
+
+DECLARE
+  CURSOR emp_cur IS
+    SELECT empno, ename FROM emp
+    WHERE deptno = 10 ;
+ emp_rec emp_cur%ROWTYPE;
+BEGIN
+  OPEN emp_cur;
+
+  LOOP
+    FETCH emp_cur INTO emp_rec;
+    --カーソルが最後まで行ったときに抜ける
+    EXIT WHEN emp_cur%NOTFOUND;
+    --取り出した行数を出力
+    DBMS_OUTPUT.PUT_LINE(emp_cur%ROWCOUNT);
+   END LOOP;
+END;
+/
+
+●暗黙カーソル属性
+SQL%NOTFOUND … DML文(INSERT、UPDATE、DELETE)が処理した行数が0行
+                            もしくはSELECT INTO文が1行も返さない場合、TRUEを返す
+SQL%FOUND    … %NOTFOUNDの逆
+SQL%ROWCOUNT … DML文(INSERT、UPDATE、DELETE)が処理した行数
+                             SELECT INTO文が返す行数を戻す
+
+使用例：）
+set serveroutput on
+
+BEGIN
+  DELETE FROM emp WHERE deptno = 10;
+  DBMS_OUTPUT.PUT_LINE(SQL%ROWCOUNT);
+END;
+/
+
+●無名の内部例外
+※事前定義されていない内部例外を補足する例
+set serveroutput on
+
+DECLARE
+CURSOR emp_cur IS
+  SELECT sal FROM emp
+  WHERE deptno = 10 FOR UPDATE NOWAIT;
+  --例外名を定義
+  cursor_err EXCEPTION;
+  --ORA-1002例外に例外名を設定
+  PRAGMA EXCEPTION_INIT(cursor_err, -1002);
+BEGIN
+  FOR r IN emp_cur LOOP
+    UPDATE emp
+    SET sal = r.sal * 1.2
+    WHERE CURRENT OF emp_cur;
+    --無効なカーソル処理例外が発生(ORA-1002)
+   COMMIT;
+  END LOOP;
+EXCEPTION
+  WHEN cursor_err THEN
+    DBMS_OUTPUT.PUT_LINE('内部エラー発生！');
+END;
+/
+
+●ユーザ定義エラーのサンプル
+set serveroutput on
+
+DECLARE
+  no NUMBER;
+  err EXCEPTION;
+BEGIN
+  no := 90;
+  IF no <= 100 THEN
+    RAISE err;
+  END IF;
+EXCEPTION
+  WHEN err THEN
+  DBMS_OUTPUT.PUT_LINE('ユーザ定義例外発生!!');
+END;
+/
+
+●ユーザ定義のエラーメッセージ
+set serveroutput on
+
+DECLARE
+  e_empno NUMBER;
+
+BEGIN
+  SELECT empno INTO e_empno FROM emp
+  WHERE empno = 7369;
+
+  IF e_empno > 1000 THEN
+    RAISE_APPLICATION_ERROR(-20001, 'empnoの値が不正です');
+  END IF;
+END;
+/
+
+(実行結果)
+SQL> @C:\Home\Src\PLSQL\UserDefineException2.sql
+DECLARE
+*
+行1でエラーが発生しました。:
+ORA-20001: empnoの値が不正です
+ORA-06512: 行9
+
+※但し、使用できるエラー番号は-20000から-20999まで。
+※設定できるエラーメッセージは最大2048バイトまで。
+
+●エラー報告関数
+(C:\Home\Src\PLSQL\ErrFunction.sqlの中身)
+set serveroutput on
+
+DECLARE
+e_empno NUMBER;
+
+BEGIN
+SELECT empno INTO e_empno FROM emp;
+
+EXCEPTION
+WHEN no_data_found THEN
+	DBMS_OUTPUT.PUT_LINE('事前定義例外発生');
+WHEN others THEN
+	--エラーコードを表示
+	DBMS_OUTPUT.PUT_LINE(sqlcode);
+	--エラーメッセージを表示
+	DBMS_OUTPUT.PUT_LINE(sqlerrm);
+END;
+/
+
+(実行結果)
+SQL> @C:\Home\Src\PLSQL\ErrFunction.sql
+-1422
+ORA-01422: 完全フェッチがリクエストよりも多くの行を戻しました
+
+PL/SQLプロシージャが正常に完了しました。
+
+●例外処理時のトランザクション
+PL/SQLブロック内のEXCEPTION句で例外を拾った場合、
+トランザクションは継続されるが、拾われなかった場合はロールバックされる。
+
+●ストアドプロシージャへの実行権限付与
+GRANT EXECUTE ON ストアドプロシージャ名 TO ユーザ名
+
+●PL/SQLの識別子の命名規則
+・名前の長さは最大30バイト
+・1文字目は英字、2文字目以降は英字、数字、$、_、#
+・ハイフン、スラッシュ、空白は使用できない
+・Oracleの予約語は指定できない
+
+●FOR文のデクリメントサンプル
+set serveroutput on
+DECLARE
+	r PLS_INTEGER := 99;
+BEGIN
+	--ループカウンタは外で宣言しなくともよい
+	--デクリメントする
+	--初期値と終了値の書き方に注意
+	FOR r IN REVERSE 1..3 LOOP
+		DBMS_OUTPUT.PUT_LINE('HELLO WORLD ' || TO_CHAR(r));
+	END LOOP;
+	--ループカウンタ「r」とは違う値になる
+	DBMS_OUTPUT.PUT_LINE('HELLO WORLD ' || TO_CHAR(r));
+END;
+/
+
+●SELECT INTOを実行したときの例外
+TOO_MANY_ROW例外
+　結果が複数行帰ってきたときの例外
+
+NO_DATA_FOUND例外
+　データがない場合の例外
+
+
