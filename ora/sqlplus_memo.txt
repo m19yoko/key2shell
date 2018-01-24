@@ -185,3 +185,351 @@ DEFINE DEFINE_NUM      =        777 (NUMBER)
 SQL> ALTER SESSION
        SET nls_date_format = 'yyyy/mm/dd hh24:mi:ss';
 
+●SQLPlusでバッファ上の文字列を置換する
+CHANGEコマンドを使用する
+ 
+#バッファ上のコマンドを確認してみる
+SQL> 1
+  1* select id from dual
+SQL> c /id/*/
+  1* select * from dual
+ 
+# バッファ上のコマンドを実行してみる
+SQL> run
+  1* select * from dual
+
+D
+-
+X
+
+※但し、変換される対象はrコマンドで表示されるアスタリスクのついた行のみ。
+　
+例：
+SQL> r
+  1 select
+  2 *
+  3* from dual
+
+この例では、changeコマンドで変換できるのは3行目のみ。
+しかも、1行で置換対象文字列が2度登場したときは、最初の文字列しか置換されない。
+
+●SQLPlusのバッファの最終行でない行を変更
+SQL> l
+  1 select
+  2 'aaa',
+  3 'ccc'
+  4* from dual
+SQL>
+SQL> 3      --カレント行を3行目に変更
+  3* 'ccc'
+SQL>
+SQL> c /ccc/bbb/ --バッファ行を変更
+  3* 'bbb'
+SQL>
+SQL> l      --バッファの内容を確認
+  1 select
+  2 'aaa',
+  3 'bbb'
+  4* from dual
+SQL> r
+  1 select
+  2 'aaa',
+  3 'bbb'
+  4* from dual
+'AA 'BB
+--- ---
+aaa bbb
+SQL>
+
+●変数の定義と変数への代入
+# 変数の宣言、初期化
+SQL> define id_num = 123
+# 内容を確認
+SQL> define id_num
+DEFINE ID_NUM          = "123" (CHAR)
+# 変数へユーザより入力させる
+SQL> ACCEPT id_num NUMBER FORMAT "999.99"
+1.1
+# 内容を確認
+SQL> define id_num
+DEFINE ID_NUM          =        1.1 (NUMBER)
+SQL>
+
+●同じ値は一度しか表示させない
+SQLPlusのbreakコマンドを使うと、同じ値が何行も続くとき1度しか表示させない。
+
+例：AUTHID列が全て同じ値の場合
+SQL>
+SQL> break on authid skip 1
+SQL>
+SQL>
+SQL> r
+ 1* SELECT OBJECT_NAME, AUTHID FROM USER_PROCEDURES
+
+OBJECT_NAME                  AUTHID
+---------------------------- ------------
+ALERT_SENT                   DEFINER
+TAB_FUN
+PIPE_SENT
+CALLEMP_NEST
+BULK_RETURNING
+DEL_CASCADE
+OPEN_EMP
+DBMS_SHARED_POOL
+DBMS_SHARED_POOL
+DBMS_SHARED_POOL
+DBMS_SHARED_POOL
+
+OBJECT_NAME                  AUTHID
+---------------------------- ------------
+DBMS_SHARED_POOL             DEFINER
+DEPTREE_FILL
+DELETE_TABLE
+OPEN_DATA
+INOUTPROC
+FILE_UNLOAD_DEPT
+SELECT_DEPT
+CALLEMP
+TRIANGLE
+F_IOTEST
+DBMS_SHARED_POOL
+
+OBJECT_NAME                  AUTHID
+---------------------------- ------------
+CHECK_SAL                    DEFINER
+INSTEAD_TRI
+MODIFY_EMP2
+EMP_NOMOD
+MODIFY_EMP
+
+
+27行が選択されました。
+
+SQL>
+SQL>
+SQL>
+SQL> clear break
+breaksはクリアされました。
+SQL>
+SQL>
+
+●LONG型のデフォルト表示サイズを変更する
+SQLPlusでのLONG型のデフォルト表示サイズは80文字なので、
+以下のSQLPlusコマンドで変更できる
+
+set long 表示サイズ
+
+●表示列幅を変更
+SQLPlusでの表示列幅の変更
+column 列名 format a30        --  幅を最大30文字までに変更
+column 列名 format 999999  -- 幅を最大数字6桁に変更。6桁未満の場合、左側を空白にする。
+column 列名 format 000000  -- 幅を最大数字6桁に変更。6桁未満の場合、0埋めする。
+
+●DBリンクの確認
+$ sqlplus '/ as sysdba'
+SQL> column owner format a10
+SQL> column host format a15
+SQL> column username format a15
+SQL> column db_link format a25
+SQL> set line 400
+SQL> 
+SQL> select * from dba_db_links;
+
+(実行結果例：)
+DB_LINK
+--------------------------------------------------------------------------------
+USERNAME                       PASSWORD
+------------------------------ ------------------------------
+HOST
+--------------------------------------------------------------------------------
+CREATED
+----------
+LINKNAME.HISHIDAMA.JP
+USERNAME                       PASSWORD
+DBNAME
+2008/10/04
+
+●ページサイズを0に
+・set pagesize 0 
+ PAGESIZE の 0 は特別な値でページヘッダー、列ヘッダー、ページブレーク、タイトル、初期空白行（NEWPAGE） などをすべて非表示にする。
+
+●ユーザの所有テーブル等を表示
+
+* テーブル一覧表示 ... select table_name from user_tables;
+
+tableの部分を変えれば、他の情報もだいたいこの形で取得できます。例えば、次のようになります。
+
+* select view_name from user_views;
+* select constraint_name from user_constraints;
+* select sequence_name from user_sequences;
+* インデックス一覧表示 ... select * from user_ind_columns; (user_indexesより便利)
+* ビュー定義表示 ... select view_name,text from user_views where view_name = 'ビュー名';
+* バージョン確認 ... select banner from v$version;
+
+●パフォーマンス計測 (時間計測)
+* 計測開始 ... set timing on
+
+●ファイル入出力
+* ファイルからのコマンド読み込み ... @input.txt
+* ファイルへの結果の書き出し ... spool output.txt
+* ファイルへの書き出しを止める ... spool off
+
+●表示を見やすくするコマンド
+* 現在の設定項目の一覧表示 ... show all 
+* 画面の桁数を設定。例えば400文字にする場合 ... set lin 400 
+* カラムの区切り文字を設定。例えばカンマで区切る場合 ... set colsep "," 
+* 文字列カラムの桁数を指定。
+  例えばカラム名fooの桁数を32文字にする場合 ... column foo format a32 
+* 数値カラムの桁数を指定。
+  例えばカラム名barの桁数を数字4桁にする場合 ... column bar format 9999 (必要な桁数分、9を並べます) 
+* 数値カラムの桁数を指定。
+  例えばカラム名bazの桁数を数字4桁で左にゼロ詰めの場合 ... column baz format 0000 
+* nullを可視化。例えばnullを#で表示する場合 ... set NULL #
+
+●SPOOLコマンド
+SQLPlusの出力結果をファイルに出力する。
+デフォルトは上書きモード。
+(コマンド画面)
+SQL> SPOOL
+現在はスプールしていません。
+SQL> SPOOL C:\Home\spoolret.txt
+SQL> DESC emp;
+名前                                            NULL?      型
+----------------------------------------- ------------ ------------------------
+EMPNO                                          NOT NULL  NUMBER(4)
+ENAME                                                           VARCHAR2(10)
+JOB                                                                VARCHAR2(9)
+MGR                                                               NUMBER(4)
+HIREDATE                                                       DATE
+SAL                                                                NUMBER(7,2)
+COMM                                                            NUMBER(7,2)
+DEPTNO                                                         NUMBER(2)
+
+SQL> SPOOL OFF
+
+(C:\Home\spoolret.txtの内容)
+SQL> DESC emp;
+名前                                            NULL?      型
+----------------------------------------- ------------ ------------------------
+EMPNO                                          NOT NULL  NUMBER(4)
+ENAME                                                           VARCHAR2(10)
+JOB                                                                VARCHAR2(9)
+MGR                                                               NUMBER(4)
+HIREDATE                                                       DATE
+SAL                                                                NUMBER(7,2)
+COMM                                                            NUMBER(7,2)
+DEPTNO                                                         NUMBER(2)
+
+SQL> SPOOL OFF
+
+●SPOOLファイルに追記する
+※Oralce10g以降のみ
+SQL> set head off  --ヘッダ部分を出力しない
+SQL> spool C:\Home\spoolret.txt append
+SQL> select count(*) from emp;
+
+        14
+
+SQL> spool off
+SQL>
+(C:\Home\spoolret.txtの内容)
+(出力結果が追記されている)
+SQL> DESC emp;
+ 名前                                      NULL?    型
+ ----------------------------------------- -------- ----------------------------
+ EMPNO                                     NOT NULL NUMBER(4)
+ ENAME                                              VARCHAR2(10)
+ JOB                                                VARCHAR2(9)
+ MGR                                                NUMBER(4)
+ HIREDATE                                           DATE
+ SAL                                                NUMBER(7,2)
+ COMM                                               NUMBER(7,2)
+ DEPTNO                                             NUMBER(2)
+
+SQL> SPOOL OFF
+SQL> select count(*) from emp;
+
+        14
+
+SQL> spool off
+
+●SPOOLファイルのファイル名に日付を設定
+（コマンド画面）
+--別名log_dateの値を変数log_date_textに設定する
+SQL> column log_date new_value log_date_text noprint
+SQL> select to_char(sysdate,'yyyymmdd') log_date from dual;
+
+SQL> spool C:\Home\spooltest&log_date_text._temp.txt
+SQL> select count(*) from emp;
+
+  COUNT(*)
+----------
+        14
+
+SQL> spool off
+ 
+ファイル(spooltestYYYYMMDD_temp.txt)の中身
+SQL> select count(*) from emp;
+
+  COUNT(*)
+----------
+        14
+
+SQL> spool off
+
+●show parameterコマンド
+初期化パラメータを部分検索できる
+ 
+SQL> show parameter target
+
+NAME                                 TYPE        VALUE
+------------------------------------ ----------- -------------------------
+archive_lag_target                   integer     0
+db_flashback_retention_target        integer     1440
+fast_start_io_target                 integer     0
+fast_start_mttr_target               integer     0
+memory_max_target                    big integer 820M
+memory_target                        big integer 820M
+pga_aggregate_target                 big integer 0
+sga_target                           big integer 0
+
+●長い行を切り捨てる
+set truncate on
+デフォルトはoff
+
+●検索結果に日付を出力
+SQL> set termout off
+SQL> column curdate new_value report_date
+SQL> SELECT TO_CHAR(SYSDATE, 'yyyy/MM/dd') curdate FROM dual;
+
+CURDATE
+----------
+2009/08/18
+
+SQL> set termout off
+SQL> BTITLE LEFT "Report Date:" report_date
+ 
+（実行結果）
+SQL> select count(*) from emp;
+
+  COUNT(*)
+----------
+        14
+
+Report Date:2009/08/18
+
+●SQLPlusコマンドの改行
+ハイフン(-)改行できる。
+以下のようなことも可能
+SQL> select 'Hello-
+> World!' from dual
+  2  ;
+
+'HELLOWORLD!
+------------
+Hello World!
+
+●SQLPlusショートカット
+Ctrl+S … 検索結果の表示を一時とめる。何かキーを押すと再開する
+Ctrl+C … 処理を中断する。何も処理していないときに押すとSQLPlusが終了する
+

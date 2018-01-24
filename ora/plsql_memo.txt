@@ -1017,7 +1017,54 @@ NULLである場合は例外を発生させる。
 ・PLSQL_CODE_TYPEをシステムレベルでNATIVEに設定する
 ・$ORACLE_HOME/rdbms/admin/dbmsupgnv.sqlを実行
 
-●BLOBを読みだしてファイルに出力
+●BLOBの登録(INSERT)
+例）　
+ファイル「c:\temp\big_star.bmp」を表「blob_sample」に格納する。
+
+（１）表「blob_sample」のDDL
+create table blob_sample (
+　blob_id　char(3)　primary key,
+　blob_data　blob
+);
+
+
+（２）事前準備。バイナリファイルの格納ディレクトリ「c:\temp」のディレクトリオブジェクト「LOB_DIR」を作成する
+-- ディレクトリオブジェクトの作成
+create directory LOB_DIR as 'c:\temp';
+--　ディレクトリオブジェクトに読み込み権限をユーザ「test」に付与する。
+grant read on directory LOB_DIR to test;
+　
+（３）表「blob_sample」にファイル「c:\temp\big_star.bmp」を格納する。
+
+declare
+
+　-- ファイル「c:\temp\big_star.bmp」をbfile型で生成
+　bmp_file bfile := bfilename( 'LOB_DIR', 'big_star.bmp');
+
+　-- 表「blob_sample」の項目「blob_data」のポインタを格納する変数を定義
+　v_blob_data blob;
+
+begin
+
+　-- 表「blob_sample」に新規レコードを生成。項目「blob_data」には、空データを設定する。
+　-- また、項目「blob_data」のポインタを「v_blob_data」に代入する。
+　insert into blob_sample values( 'B01', empty_blob())
+　　　returning blob_data into v_blob_data;
+
+　-- ファイル「c:\temp\big_star.bmp」を読み込みモードでオープン
+　dbms_lob.fileopen( bmp_file, dbms_lob.file_readonly);
+
+　--　ファイルのデータを、項目「blob_data」に更新する。
+　dbms_lob.loadfromfile( v_blob_data, bmp_file, dbms_lob.getlength( bmp_file ));
+
+　-- ファイル「c:\temp\big_star.bmp」をクローズ
+　dbms_lob.fileclose( bmp_file );
+
+　commit;
+
+end;
+
+●BLOBを読みだしてファイルに出力(SELECT)
 例１）　表「blob01」の列「filedata」に格納されているBLOBデータをファイル「c:\temp\'sample02.gif'」に出力する。
 
 （１）事前準備。バイナリファイルの格納ディレクトリ「c:\temp」のディレクトリオブジェクト「LOB_DIR」を作成する
@@ -1065,57 +1112,28 @@ begin
 
 　　end loop;
 
--- 出力ファイル「sample02.gif」をクローズする。
-utl_file.fclose(v_file_handle);
+	-- 出力ファイル「sample02.gif」をクローズする。
+	utl_file.fclose(v_file_handle);
 
 end;
 
-●BLOBの登録
-例１）　
-ファイル「c:\temp\big_star.bmp」を表「blob_sample」に格納する。
+●BLOBの取得と更新(UPDATE)
+DECLARE
+  v_src BFILE := BFILENAME('FILE_DIR','AR.gif');
+  v_loc BLOB;
+  v_amount NUMBER;
+BEGIN
+  SELECT resume INTO v_loc FROM cust WHERE id=1 FOR UPDATE;
+  DBMS_LOB.FILEOPEN(v_src);
+  v_amount := DBMS_LOB.GETLENGTH(v_src);
+  
+  --BLOBをBFILEで更新
+  DBMS_LOB.LOADFROMFILE(v_loc,v_src,v_amount);
+  DBMS_LOB.CLOSE(v_src);
+  UPDATE cust SET resume=v_loc WHERE id=1;
+END;
+/
 
-（１）表「blob_sample」のDDL
-create table blob_sample (
-　blob_id　char(3)　primary key,
-　blob_data　blob
-);
-
-
-（２）事前準備。バイナリファイルの格納ディレクトリ「c:\temp」のディレクトリオブジェクト「LOB_DIR」を作成する
--- ディレクトリオブジェクトの作成
-create directory LOB_DIR as 'c:\temp';
---　ディレクトリオブジェクトに読み込み権限をユーザ「test」に付与する。
-grant read on directory LOB_DIR to test;
-　
-（３）表「blob_sample」にファイル「c:\temp\big_star.bmp」を格納する。
-
-declare
-
-　-- ファイル「c:\temp\big_star.bmp」をbfile型で生成
-　bmp_file bfile := bfilename( 'LOB_DIR', 'big_star.bmp');
-
-　-- 表「blob_sample」の項目「blob_data」のポインタを格納する変数を定義
-　v_blob_data blob;
-
-begin
-
-　-- 表「blob_sample」に新規レコードを生成。項目「blob_data」には、空データを設定する。
-　-- また、項目「blob_data」のポインタを「v_blob_data」に代入する。
-　insert into blob_sample values( 'B01', empty_blob())
-　　　returning blob_data into v_blob_data;
-
-　-- ファイル「c:\temp\big_star.bmp」を読み込みモードでオープン
-　dbms_lob.fileopen( bmp_file, dbms_lob.file_readonly);
-
-　--　ファイルのデータを、項目「blob_data」に更新する。
-　dbms_lob.loadfromfile( v_blob_data, bmp_file, dbms_lob.getlength( bmp_file ));
-
-　-- ファイル「c:\temp\big_star.bmp」をクローズ
-　dbms_lob.fileclose( bmp_file );
-
-　commit;
-
-end;
 
 ●CLOBの取得と書き込み
 DECLARE
@@ -1132,6 +1150,23 @@ BEGIN
   DBMS_LOB.WRITE(v_loc,v_amount,v_offset,v_text);
 END;
 /
+
+●行削除とLOB値
+LOB列に格納したLOB値は、行が削除されるとLOB値も削除されます。行は残してLOB値だけを参照できないようにする場合、NULL値を格納する方法と空のロケータで初期化する方法があります。
+
+LOB値の一部または全部を削除するのであれば、DBMS_LOB.ERASEを使用することもできます。
+
+NULL値と空のロケータは別のものです。
+
+SQL> INSERT INTO prod VALUES(100,NULL);
+SQL> INSERT INTO prod VALUES(101,EMPTY_CLOB());
+SQL> SELECT id,LENGTH(comments) FROM prod;
+        ID LENGTH(COMMENTS)
+---------- ----------------
+       100
+       101 0
+NULL値は長さもNULLが戻りますが、空のロケータは値が格納されていることがわかります。
+
 
 ●BFILE型を扱ったサンプル？
 --ディレクトリオブジェクト作成
@@ -3720,4 +3755,77 @@ TOO_MANY_ROW例外
 NO_DATA_FOUND例外
 　データがない場合の例外
 
+●引数付きでスクリプトを実行
+ 
+(param.sqlの中身)
+-- 引数１＋引数２
+select to_number('&1') + to_number('&2') from dual;
+ 
+ 
+(実行結果)
+SQL> @C:\Home\Src\PLSQL\param.sql 100 200
+旧   1: select to_number('&1') + to_number('&2') from dual
+新   1: select to_number('100') + to_number('200') from dual
+
+TO_NUMBER('100')+TO_NUMBER('200')
+---------------------------------
+                              300
+
+●日時の演算
+現在から3時間25分30秒前を表示
+
+
+SQL> SELECT
+       SYSDATE ,
+       SYSDATE - TO_DSINTERVAL('0 03:25:30') TARGET_DATE
+     FROM dual;
+
+SYSDATE                             TARGET_DATE
+-------------------               -------------------
+2005/04/08 02:40:23  2005/04/07 23:14:53
+
+
+または
+SQL> SELECT
+       SYSDATE ,
+       SYSDATE - INTERVAL '0 03:25:30' DAY TO SECOND
+         TARGET_DATE
+     FROM dual;
+
+SYSDATE                               TARGET_DATE
+-------------------                -------------------
+2005/04/08 02:41:33  2005/04/07 23:16:03
+
+●日付の演算
+1年６ヶ月後を表示
+SQL> SELECT
+       SYSDATE,
+       SYSDATE + INTERVAL '1-6' YEAR TO MONTH TARGET_DATE
+     FROM dual;
+
+SYSDATE                             TARGET_DATE
+-------------------               -------------------
+2005/04/08 02:48:39  2006/10/08 02:48:39
+
+または
+SQL> SELECT
+       SYSDATE,
+       SYSDATE + TO_YMINTERVAL('1-6') TARGET_DATE
+     FROM dual;
+
+SYSDATE                              TARGET_DATE
+-------------------                -------------------
+2005/04/08 02:47:29   2006/10/08 02:47:29
+
+
+１年６ヶ月10日後を表示
+SQL> SELECT
+	   SYSDATE,
+	   SYSDATE + INTERVAL '1-6' YEAR TO MONTH
+						 + INTERVAL '10' DAY TARGET_DATE
+	   FROM dual;
+
+SYSDATE                              TARGET_DATE
+-------------------                -------------------
+2005/04/08 02:50:15  2006/10/18 02:50:15
 

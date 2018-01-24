@@ -177,3 +177,156 @@ ENABLED
 MODIFY_EMP                     AFTER EACH ROW   EMP
 ENABLED
 
+●初期化パラメータ確認方法
+・パラメータ「background_dump_dest」の設定内容表示
+SQL> SHOW PARAMETER background_dump_dest;
+
+または
+SQL> SELECT NAME,VALUE FROM V$PARAMETER WHERE NAME = 'background_dump_dest';
+
+●ストアドの定義者権限と実行者権限
+通常、ストアドはストアドを実行したユーザの権限で動作するのではなく、ストアドの持ち主の権限で動作する。
+これを定義者権限と呼ぶ。
+ストアドを持ち主の権限でなく、実行者の権限で動作するには、
+以下のように定義する
+
+CREATE [OR REPLACE] PROCEDURE プロシージャ名
+[(パラメータ名)]
+AUTHID CURRENT_USER     --実行者権限を表す
+{ IS | AS }
+     [宣言]
+BEGIN
+     実行部
+[EXCEPTION]
+     [例外処理部]
+END [プロシージャ名];
+
+CREATE [OR REPLACE] FUNCTION ファンクション名
+[(パラメータ名)]
+RETURN 戻りデータ型
+AUTHID CURRENT_USER     --実行者権限を表す
+{ IS | AS }
+     [宣言]
+BEGIN
+     実行部
+[EXCEPTION]
+     [例外処理部]
+END [ファンクション名];
+
+●索引が使われているかをチェックする（AUTOTRACE編）
+
+Oracleがトレースモードで動いていなくても実行可能な解析方法である。
+
+事前準備
+SQL> connect sys/change_on_install@expserver
+接続されました。
+SQL> @K:\oracle\ora81\sqlplus\admin\plustrce.sql  /* plustrace ロールを作成 */
+...
+SQL>grant plustrace to scott;  /* AUTOTRACEを取得するユーザにロールを付加する */
+
+権限付与が成功しました。
+
+SQL>connect scott/tiger@expserver
+接続されました。
+SQL> @K:\oracle\ora81\RDBMS\ADMIN\utlxplan /* 実行計画を保存するためのテーブルを作成 */
+ 
+表が作成されました。
+
+
+AUTOTRACE を使う
+
+・SET AUTOTRACE ON   /* 結果セット、実行計画、統計情報 */
+・SET AUTOTRACE TRACEONLY /* 実行計画、統計情報 */
+・SET AUTOTRACE TRACEONLY EXPLAIN /* 実行計画 */
+・SET AUTOTRACE TRACEONLY STATISTICS /* 統計情報 */
+SQL> SET AUTOTRACE ON
+SQL>  select e.empno, e.ename, e.deptno, d.dname from dept d, emp e
+  2   where
+  3        d.deptno = e.deptno
+  4    and e.deptno = 20;
+
+     EMPNO ENAME          DEPTNO DNAME
+---------- ---------- ---------- --------------
+      7369 SMITH              20 RESEARCH
+      7566 JONES              20 RESEARCH
+      7788 SCOTT              20 RESEARCH
+      7876 ADAMS              20 RESEARCH
+      7902 FORD               20 RESEARCH
+
+
+実行計画
+----------------------------------------------------------
+   0      SELECT STATEMENT Optimizer=CHOOSE
+   1    0   NESTED LOOPS
+   2    1     TABLE ACCESS (FULL) OF 'EMP'
+   3    1     TABLE ACCESS (BY INDEX ROWID) OF 'DEPT'
+   4    3       INDEX (UNIQUE SCAN) OF 'PK_DEPT' (UNIQUE)
+
+
+
+
+統計
+----------------------------------------------------------
+          0  recursive calls
+          4  db block gets
+         12  consistent gets
+          0  physical reads
+          0  redo size
+        781  bytes sent via SQL*Net to client
+        425  bytes received via SQL*Net from client
+          2  SQL*Net roundtrips to/from client
+          0  sorts (memory)
+          0  sorts (disk)
+          5  rows processed
+
+SQL> set autotrace off   /* AUTO TRACE を使用しない */
+
+
+→ ここから何がわかるのか？
+
+統計情報
+・recursive calls
+・db block gets
+CURRENT ブロックが要求された回数
+
+・consistent gets
+・physical reads
+・redo size
+生成された REDO の合計バイト数
+・bytes sent via SQL*Net to client
+・bytes received via SQL*Net from client
+Oracle Net
+
+・SQL*Net roundtrips to/from client
+クライアントに送られた Oracle Net メッセージとクライアントから受信した Oracle Net のメッセージの合計数
+・sorts (memory)
+メモリー内で完全に実行され、ディスク書き込みを必要としなかったソート操作の数
+・sorts (disk)
+少なくとも１回のディスク書き込みを必要としたソート操作の数
+・rows processed
+操作中に処理された行数
+
+●オブジェクト権限の確認
+USER_TAB_PRIVS ：
+ログインユーザの所有するオブジェクトに与えれているオブジェクト権限の確認
+ログインユーザが、付与したオブジェクト権限の確認
+ログインユーザが、付与されたオブジェクト権限の確認
+
+SELECT * FROM USER_TAB_PRIVS;
+
+[カラムについて]
+GRANTEE：権限を付与された側
+OWNER：オブジェクトの所有者
+TABLE_NAME：オブジェクト名
+GRANTOR：権限を付与した人
+PRIVILEGE：オブジェクト権限
+GRANTABLE：WITH GRANT OPTION付かどうか
+
+USER_TAB_PRIVS_MADE ：
+ログインユーザが所有するオブジェクトに関するアクセス権限の確認
+
+USER_TAB_PRIVS_RECD ：
+ログインユーザに付与されているオブジェクト権限の確認
+
+※USER_SYS_PRIVS:システム権限
+
