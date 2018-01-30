@@ -3558,6 +3558,7 @@ PL/SQLプロシージャが正常に完了しました。
 ●WHERE CURRENT OF句
 WHERE CURRENT OF句を使うとROWIDによってアクセスできるので、
 高速に処理できる。
+カーソル処理内のUPDATE文、DELETE文で使用。
 ただし、FOR UPDATE句を使用していないとできない。
 
 例：）
