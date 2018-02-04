@@ -1677,7 +1677,7 @@ RETURNING句では、DML文で変更した結果を取得することができ�
 
 CREATE OR REPLACE PACKAGE emp_app
 AS
---レコード型の宣言
+--レコード型(構造体)の宣言
 TYPE emp_type IS RECORD (
      empno emp.empno%TYPE,
      ename emp.ename%TYPE,

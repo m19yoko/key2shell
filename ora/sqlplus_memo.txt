@@ -85,7 +85,7 @@ EXECUTE :g_telno := '12345678901'
 
 PL/SQLプロシージャが正常に完了しました
 
--- ストアド呼び出し
+-- ストアド呼び出し(EXECでも可)
 EXECUTE change_tel(:g_telno)
 
 PL/SQLプロシージャが正常に完了しました
