@@ -117,6 +117,49 @@ $ ./param_all.sh aaa bbb cc
 aaa,bbb,cc
 aaa bbb cc
 
+・「"$@"」と「"$*"」の違い
+$#の結果が異なる。"$*"は全て一つの引数になってしまう。
+"$*"は区切り文字がIFS環境変数の１文字目となる。
+
+・「$@」と「$*」の違い
+違いはない。ダブルクォートがない場合は、変数展開及びパス名展開されてしまう。
+
+(例：param_all_dbn.sh)
+#!/bin/bash
+
+function countargs
+{
+	echo "$# args."
+}
+
+countargs $@
+# 上記と結果は同じ
+countargs $*
+
+# このシェルだけIFS環境変数を変更（呼び出し元シェルには影響ない）
+IFS=,
+echo $*
+# 上記と結果は同じ
+echo $@
+
+param_all_dbn.shの実行結果は以下のようになる
+$ ./param_all_dbn.sh ./param*
+3 args.
+3 args.
+./param_all.sh ./param_all_dbn.sh ./param_chk.sh
+./param_all.sh ./param_all_dbn.sh ./param_chk.sh
+$
+*パス名展開されてカレントフォルダでparamで始まるファイルの一覧が引数になってしまっている！
+
+実行結果その２
+$ ./param_all_dbn.sh 'aa bb' 'ccc'
+3 args.
+3 args.
+aa bb ccc
+aa bb ccc
+$
+*引数２個で実行したつもりが第一引数の空白で分解されて引数３個になってしまう。
+
 ・変数の記述と区切り
 変数$abcは${abc}の省略形である。
 変数$abcにアンダースコアをつけたい場合、省略形の形では実現できない。
